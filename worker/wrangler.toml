@@ -3,7 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2026-08-01"
 
 [vars]
-ALLOWED_ORIGINS = "http://localhost:5173"
+ALLOWED_ORIGINS = "http://localhost:5173,https://opora-saas-platform.pages.dev"
 
 [[d1_databases]]
 binding = "DB"

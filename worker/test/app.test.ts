@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createApp, type Env } from '../src/index';
 import { FakeD1 } from './fakeD1';
 
-function client(db: FakeD1) {
-  const env = { DB: db } as unknown as Env;
+function client(db: FakeD1, extraEnv: Partial<Env> = {}) {
+  const env = { DB: db, ...extraEnv } as unknown as Env;
   const app = createApp(env);
   return {
     request(path: string, init?: RequestInit) {
@@ -30,6 +30,29 @@ describe('opora-api', () => {
     const res = await c.request('/v1/health');
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, service: 'opora-api' });
+  });
+
+  it('answers CORS preflight for allowed origins and skips the DB', async () => {
+    const res = await client(new FakeD1([]), {
+      ALLOWED_ORIGINS: 'https://opora-saas-platform.pages.dev',
+    }).request('/v1/finance/contractors', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://opora-saas-platform.pages.dev',
+        'Access-Control-Request-Method': 'POST',
+      },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://opora-saas-platform.pages.dev',
+    );
+  });
+
+  it('omits CORS headers for unknown origins', async () => {
+    const res = await client(new FakeD1([])).request('/v1/finance/contractors', {
+      headers: { Origin: 'https://evil.example' },
+    });
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
 
   it('lists contractors scoped to the tenant', async () => {

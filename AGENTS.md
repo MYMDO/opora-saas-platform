@@ -6,6 +6,7 @@
 - Stack: **Vite 6 + React 19 + TypeScript (strict)**, recharts, lucide-react, vitest, ESLint 9 (flat config) + react-hooks rules. Backend (Phase 2): **Hono on Cloudflare Workers + D1** in `worker/` (own package.json/tsconfig; Free-Tier guardrails — no DO/Queues/KV-writes; tenant via `X-Opora-Tenant`, app-level tenancy since D1 has no RLS). SPA by design for Phase 1; Next.js migration is off the table while Pages serves the SPA.
 - Commands: `npm install` · `npm run dev` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run build`. CI runs them in that order plus `worker/` typecheck+tests (`.github/workflows/ci.yml`); run lint + typecheck + test after every change.
 - Worker commands: from `worker/` — `npm run dev` (local workerd+D1), `npm run db:migrate:local|--remote`, `npm run deploy` → https://opora-api.p4d-b2q.workers.dev
+- Frontend deploy: `npm run build && npx wrangler pages deploy dist --project-name opora-saas-platform` → https://opora-saas-platform.pages.dev (CORS allow-list in `worker/wrangler.toml` must include the domain)
 
 ## Files
 

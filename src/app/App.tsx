@@ -4,6 +4,7 @@ import {
   Bot,
   Building2,
   ChevronDown,
+  Cloud,
   LayoutDashboard,
   ShieldCheck,
   Sparkles,
@@ -91,7 +92,7 @@ export default function App() {
     document.title = `${NAV.find((n) => n.id === tab)?.label ?? 'Огляд'} · ОПОРА`;
   }, [tab]);
 
-  const { scenario } = useScenario();
+  const { scenario, apiOnline } = useScenario();
   const finance = getFinanceSnapshot(scenario.finance);
   const energy = getEnergySnapshot();
 
@@ -186,11 +187,30 @@ export default function App() {
             color="var(--finance)"
             text={`Ризик ${finance.risk.scorePercent}% · ${finance.risk.label}`}
           />
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Bell size={14} color="var(--text-mute)" />
-            <span className="f-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              Київ, {formatTimeUa(now)}
-            </span>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <StatusMetric
+              Icon={Cloud}
+              color={
+                apiOnline == null
+                  ? 'var(--text-mute)'
+                  : apiOnline
+                    ? 'var(--finance)'
+                    : 'var(--danger)'
+              }
+              text={
+                apiOnline == null
+                  ? 'Хмара: перевірка…'
+                  : apiOnline
+                    ? 'Хмара: онлайн'
+                    : 'Хмара: офлайн · локальний режим'
+              }
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Bell size={14} color="var(--text-mute)" />
+              <span className="f-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                Київ, {formatTimeUa(now)}
+              </span>
+            </div>
           </div>
         </div>
 
