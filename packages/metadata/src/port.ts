@@ -10,7 +10,7 @@ export interface ReleaseMeta {
   appSlug: string;
   version: number;
   status: ReleaseStatus;
-  definition: import('@opora/dsl').AppDefinition;
+  definition: AppDefinition;
   publishedAt?: string | null;
 }
 

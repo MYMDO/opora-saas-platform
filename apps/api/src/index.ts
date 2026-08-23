@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { EntityDefinition } from '@opora/dsl';
 import type { MetadataPort } from '@opora/metadata';
-import { DataPort, RecordNotFoundError, ValidationError } from '@opora/data-runtime';
+import type { DataPort } from '@opora/data-runtime';
+import { RecordNotFoundError, ValidationError } from '@opora/data-runtime';
 
 export interface ApiDeps {
   metadata: MetadataPort;
