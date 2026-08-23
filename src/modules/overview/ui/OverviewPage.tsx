@@ -21,7 +21,6 @@ import {
   DEMO_PLAN_ID,
   DEMO_RESOLUTIONS_THIS_MONTH,
 } from '../../billing/index';
-import { DEMO_ENTERPRISE } from '../../hr/index';
 import { buildDailyActions, MODULE_LABELS, type DailyAction } from '../domain/actions';
 import { useScenario } from '../../../app/scenario';
 
@@ -108,14 +107,14 @@ function BillingRow({ label, value, note, color }: { label: string; value: strin
 }
 
 export function OverviewPage() {
-  const { finance: scenario } = useScenario();
-  const finance = getFinanceSnapshot(scenario);
+  const { scenario } = useScenario();
+  const finance = getFinanceSnapshot(scenario.finance);
   const energy = getEnergySnapshot();
 
   const actions = buildDailyActions({
     finance,
     batterySocPercent: energy.socPercent,
-    booking: DEMO_ENTERPRISE,
+    booking: scenario.hr.enterprise,
     aiResolvedToday: TODAY_AI_RESOLVED,
   });
   const topActions = actions.slice(0, 3);

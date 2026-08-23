@@ -10,5 +10,12 @@ export {
   type EmployeeBookingRequest,
   type EnterpriseBookingContext,
 } from './domain/booking';
-export { DEMO_ENTERPRISE, DEMO_EMPLOYEE_SALARY_UAH } from './data/fixtures';
+export {
+  assessBookingRoster,
+  type EmployeeRow,
+  type HrScenario,
+  type RosterAssessment,
+  type RosterRowResult,
+} from './domain/roster';
+export { DEMO_EMPLOYEES, defaultHrScenario } from './data/fixtures';
 export { BookingComplianceCard } from './ui/BookingComplianceCard';

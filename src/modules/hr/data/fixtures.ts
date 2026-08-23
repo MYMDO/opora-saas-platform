@@ -1,12 +1,25 @@
-import type { EnterpriseBookingContext } from '../domain/booking';
+import type { EmployeeRow, HrScenario } from '../domain/roster';
 
-export const DEMO_ENTERPRISE: EnterpriseBookingContext = {
+export const DEMO_ENTERPRISE = {
   territoryType: 'regular',
   hasCriticalEnterpriseStatus: true,
   isCriticalIndustry: false,
   hasTaxDebt: false,
   militaryObligatedCount: 20,
   alreadyBookedCount: 8,
-};
+} as const;
 
-export const DEMO_EMPLOYEE_SALARY_UAH = 26_000;
+export const DEMO_EMPLOYEES: ReadonlyArray<EmployeeRow> = [
+  { id: 'emp-1', name: 'Олена Коваленко', monthlySalaryUah: 31_000 },
+  { id: 'emp-2', name: 'Іван Гончар', monthlySalaryUah: 26_500 },
+  { id: 'emp-3', name: 'Марія Шевчук', monthlySalaryUah: 25_000 },
+  { id: 'emp-4', name: 'Андрій Лисенко', monthlySalaryUah: 22_000 },
+  { id: 'emp-5', name: 'Наталка Полтавка', monthlySalaryUah: 18_400 },
+];
+
+export function defaultHrScenario(): HrScenario {
+  return {
+    employees: DEMO_EMPLOYEES.map((e) => ({ ...e })),
+    enterprise: { ...DEMO_ENTERPRISE },
+  };
+}

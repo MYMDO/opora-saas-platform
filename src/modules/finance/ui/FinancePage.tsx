@@ -13,12 +13,27 @@ import { ChartTooltip, Eyebrow, KpiCard, ProgressBar } from '../../../design-sys
 import { formatDecimalUa, formatNumberUa } from '../../../lib/format';
 import { getFinanceSnapshot, VAT_RULES } from '../index';
 import { useScenario } from '../../../app/scenario';
+import { RotateCcw } from 'lucide-react';
 import { RISK_TREND } from '../data/fixtures';
 
 const inputStyle: CSSProperties = {
   padding: '7px 10px',
   borderRadius: 6,
   fontSize: 12.5,
+};
+
+const resetButtonStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
+  borderRadius: 6,
+  padding: '4px 8px',
+  cursor: 'pointer',
+  color: 'var(--text-mute)',
+  fontSize: 11,
+  flexShrink: 0,
 };
 
 function DeadlineList({
@@ -62,9 +77,16 @@ function DeadlineList({
 }
 
 export function FinancePage() {
-  const { finance: scenario, updateContractor, addContractor, removeContractor } = useScenario();
+  const {
+    scenario,
+    updateContractor,
+    addContractor,
+    removeContractor,
+    resetScenario,
+  } = useScenario();
+  const fin = scenario.finance;
   const [newName, setNewName] = useState('');
-  const snapshot = getFinanceSnapshot(scenario);
+  const snapshot = getFinanceSnapshot(fin);
   const { contractors, totals, risk, deadlines } = snapshot;
 
   function submitNew() {
@@ -123,7 +145,24 @@ export function FinancePage() {
         className="opora-grid-2"
       >
         <div className="panel" style={{ padding: 18 }}>
-          <Eyebrow color="var(--finance)">Ліміти реєстрації ПН · інтерактивно</Eyebrow>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <Eyebrow color="var(--finance)">Ліміти реєстрації ПН · інтерактивно</Eyebrow>
+            <button
+              onClick={resetScenario}
+              title="Повернути демо-дані"
+              aria-label="Скинути сценарій"
+              style={resetButtonStyle}
+            >
+              <RotateCcw size={11} /> Скинути
+            </button>
+          </div>
           <div className="f-display" style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
             Обсяг постачання на контрагента
           </div>
@@ -133,7 +172,7 @@ export function FinancePage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {scenario.contractors.map((c, i) => (
+            {fin.contractors.map((c, i) => (
               <div key={`${c.name}-${i}`}>
                 <div
                   style={{
@@ -261,7 +300,7 @@ export function FinancePage() {
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--text-mute)' }}>
             Поточний скор: {risk.scorePercent}% · {risk.label} · вікно коригування{' '}
-            {formatDecimalUa(scenario.adjustmentWindowDays, 0)} дн.
+            {formatDecimalUa(fin.adjustmentWindowDays, 0)} дн.
           </div>
           <DeadlineList deadlines={deadlines} />
         </div>

@@ -9,12 +9,12 @@
 ## Files
 
 - `src/` — canonical application code. Module boundaries follow the plan's bounded contexts:
-  - `src/app/` — shell (sidebar nav, status strip, lazy tab routing) + `scenario.tsx` (React-context store for editable scenario state — no external state libs; pages read snapshots via `useScenario()` and pass the scenario into `getFinanceSnapshot(scenario)`)
+  - `src/app/` — shell (sidebar nav, status strip, lazy tab routing) + `scenario.tsx` (React-context store for editable scenario state — no external state libs; persisted to `localStorage` under versioned key `opora-scenario-v1` with defensive load and `resetScenario()`; pages read snapshots via `useScenario()` and pass slices into `getFinanceSnapshot(scenario.finance)` / `getEnergySnapshot(...)`)
   - `src/design-system/` — `tokens.css` (all CSS variables) + shared primitives (`KpiCard`, `ProgressBar`, `AlertRow`, `Eyebrow`, `Dot`, `ChartTooltip`)
   - `src/modules/<name>/` — one folder per module (`overview`, `ai-agents`, `energy`, `finance`); each may expose `domain/` (pure logic), `data/` (fixtures), `ui/` (pages)
 - **Cross-module access goes only through a module's `index.ts` facade**, never deep-imports into another module's internals. The finance module demonstrates this.
 - `src/modules/finance/domain/` — deterministic tax rules (КМУ №1048 thresholds: 100k ₴/contractor, 1M ₴ total) and the weighted risk-score calculator. This is real business logic covered by vitest tests; change it only together with its tests and `ПЛАН_ОПОРА...md`.
-- `src/modules/hr/domain/` — booking compliance rules per КМУ №692 (salary threshold 25 941 ₴ / 21 600 ₴ frontline, quotas 50%/100%, no tax debt). Same rule applies: logic + tests change together.
+- `src/modules/hr/domain/` — booking compliance rules per КМУ №692 (salary threshold 25 941 ₴ / 21 600 ₴ frontline, quotas 50%/100%, no tax debt) plus bulk roster assessment (`assessBookingRoster`). Same rule applies: logic + tests change together.
 - `src/modules/energy/domain/` — BESS tariff-arbitrage model (DoD × round-trip efficiency × day/night spread − degradation cost) and payback calculator; `MARKET_TARIFFS` are the single source for НКРЕКП tariff figures used in UI copy too. Same rule applies: logic + tests change together.
 - `src/modules/billing/domain/` — hybrid pricing engine (platform fee + per-resolution outcome with included allowance + EMS fixed/share/capacity modes) per plan §2.4; `PLANS` is the single source for tariff-plan figures shown in UI. Same rule applies: logic + tests change together.
 - `src/modules/*/data/fixtures.ts` — hardcoded demo data (there is no backend yet). AI-agent chat replies come from a canned bank cycled by modulo.

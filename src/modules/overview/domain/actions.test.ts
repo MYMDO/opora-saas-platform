@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { assessTaxRisk, getFinanceSnapshot } from '../../finance/index';
-import { DEMO_ENTERPRISE } from '../../hr/index';
+import { defaultHrScenario } from '../../hr/index';
 import { buildDailyActions, type DailyActionsInput } from './actions';
+
+const DEMO_ENTERPRISE = defaultHrScenario().enterprise;
 
 function financeStub(
   overrides: Partial<Parameters<typeof buildDailyActions>[0]['finance']> = {},

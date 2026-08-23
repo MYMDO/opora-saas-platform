@@ -77,8 +77,8 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
 
-  const { finance: scenario } = useScenario();
-  const finance = getFinanceSnapshot(scenario);
+  const { scenario } = useScenario();
+  const finance = getFinanceSnapshot(scenario.finance);
   const energy = getEnergySnapshot();
 
   return (

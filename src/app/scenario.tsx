@@ -1,50 +1,190 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   addContractor,
-  removeContractor,
-  updateContractor,
+  removeContractor as removeContractorOp,
+  updateContractor as updateContractorOp,
   VAT_RULES,
   defaultFinanceScenario,
   type ContractorRow,
   type FinanceScenario,
 } from '../modules/finance/index';
+import {
+  defaultHrScenario,
+  type EmployeeRow,
+  type EnterpriseBookingContext,
+  type HrScenario,
+} from '../modules/hr/index';
+
+export interface AppScenario {
+  readonly finance: FinanceScenario;
+  readonly hr: HrScenario;
+}
+
+function defaults(): AppScenario {
+  return { finance: defaultFinanceScenario(), hr: defaultHrScenario() };
+}
+
+const STORAGE_KEY = 'opora-scenario-v1';
+
+function toFiniteNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function loadInitial(): AppScenario {
+  const d = defaults();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return d;
+    const parsed = JSON.parse(raw) as Partial<AppScenario> | null;
+
+    const f = parsed?.finance;
+    const finance: FinanceScenario = {
+      adjustmentWindowDays: Math.max(
+        0,
+        toFiniteNumber(f?.adjustmentWindowDays, d.finance.adjustmentWindowDays),
+      ),
+      contractors: Array.isArray(f?.contractors)
+        ? f.contractors
+            .filter(
+              (r): r is ContractorRow =>
+                r != null &&
+                typeof r.name === 'string' &&
+                Number.isFinite(r.usedUah) &&
+                Number.isFinite(r.limitUah),
+            )
+            .map((r) => ({ name: String(r.name), usedUah: Number(r.usedUah), limitUah: Number(r.limitUah) }))
+        : d.finance.contractors,
+    };
+
+    const e = parsed?.hr?.enterprise;
+    const enterprise: EnterpriseBookingContext = {
+      territoryType: e?.territoryType === 'frontline' ? 'frontline' : 'regular',
+      hasCriticalEnterpriseStatus: e?.hasCriticalEnterpriseStatus === true,
+      isCriticalIndustry: e?.isCriticalIndustry === true,
+      hasTaxDebt: e?.hasTaxDebt === true,
+      militaryObligatedCount: Math.max(0, toFiniteNumber(e?.militaryObligatedCount, d.hr.enterprise.militaryObligatedCount)),
+      alreadyBookedCount: Math.max(0, toFiniteNumber(e?.alreadyBookedCount, d.hr.enterprise.alreadyBookedCount)),
+    };
+
+    const employees: ReadonlyArray<EmployeeRow> = Array.isArray(parsed?.hr?.employees)
+      ? parsed.hr.employees
+          .filter(
+            (r): r is EmployeeRow =>
+              r != null &&
+              typeof r.id === 'string' &&
+              typeof r.name === 'string' &&
+              Number.isFinite(r.monthlySalaryUah),
+          )
+          .map((r) => ({
+            id: String(r.id),
+            name: String(r.name),
+            monthlySalaryUah: Number(r.monthlySalaryUah),
+          }))
+      : d.hr.employees;
+
+    return { finance, hr: { employees, enterprise } };
+  } catch {
+    return d;
+  }
+}
 
 interface ScenarioContextValue {
-  readonly finance: FinanceScenario;
+  readonly scenario: AppScenario;
   updateContractor(index: number, patch: Partial<ContractorRow>): void;
   addContractor(name: string): void;
   removeContractor(index: number): void;
+  addEmployee(name: string, monthlySalaryUah: number): void;
+  updateEmployee(id: string, patch: Partial<Omit<EmployeeRow, 'id'>>): void;
+  removeEmployee(id: string): void;
+  updateEnterprise(patch: Partial<EnterpriseBookingContext>): void;
+  resetScenario(): void;
 }
 
 const ScenarioContext = createContext<ScenarioContextValue | null>(null);
 
+let employeeSeq = 0;
+
 export function ScenarioProvider({ children }: { children: ReactNode }) {
-  const [finance, setFinance] = useState<FinanceScenario>(() => defaultFinanceScenario());
+  const [scenario, setScenario] = useState<AppScenario>(loadInitial);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(scenario));
+    } catch {
+      // приватний режим або переповнений сховищ-квота — сценарій лишається лише в памʼяті
+    }
+  }, [scenario]);
 
   const value = useMemo<ScenarioContextValue>(
     () => ({
-      finance,
+      scenario,
       updateContractor: (index, patch) =>
-        setFinance((prev) => ({
+        setScenario((prev) => ({
           ...prev,
-          contractors: updateContractor(prev.contractors, index, patch),
+          finance: {
+            ...prev.finance,
+            contractors: updateContractorOp(prev.finance.contractors, index, patch),
+          },
         })),
       addContractor: (name) =>
-        setFinance((prev) => ({
+        setScenario((prev) => ({
           ...prev,
-          contractors: addContractor(
-            prev.contractors,
-            name,
-            VAT_RULES.perContractorLimitUah,
-          ),
+          finance: {
+            ...prev.finance,
+            contractors: addContractor(prev.finance.contractors, name, VAT_RULES.perContractorLimitUah),
+          },
         })),
       removeContractor: (index) =>
-        setFinance((prev) => ({
+        setScenario((prev) => ({
           ...prev,
-          contractors: removeContractor(prev.contractors, index),
+          finance: {
+            ...prev.finance,
+            contractors: removeContractorOp(prev.finance.contractors, index),
+          },
         })),
+      addEmployee: (name, monthlySalaryUah) =>
+        setScenario((prev) => {
+          const clean = name.trim();
+          if (!clean) return prev;
+          employeeSeq += 1;
+          const row: EmployeeRow = {
+            id: `emp-${Date.now()}-${employeeSeq}`,
+            name: clean,
+            monthlySalaryUah: Math.max(0, monthlySalaryUah),
+          };
+          return { ...prev, hr: { ...prev.hr, employees: [...prev.hr.employees, row] } };
+        }),
+      updateEmployee: (id, patch) =>
+        setScenario((prev) => ({
+          ...prev,
+          hr: {
+            ...prev.hr,
+            employees: prev.hr.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+          },
+        })),
+      removeEmployee: (id) =>
+        setScenario((prev) => ({
+          ...prev,
+          hr: {
+            ...prev.hr,
+            employees: prev.hr.employees.filter((e) => e.id !== id),
+          },
+        })),
+      updateEnterprise: (patch) =>
+        setScenario((prev) => ({
+          ...prev,
+          hr: { ...prev.hr, enterprise: { ...prev.hr.enterprise, ...patch } },
+        })),
+      resetScenario: () => setScenario(defaults()),
     }),
-    [finance],
+    [scenario],
   );
 
   return <ScenarioContext.Provider value={value}>{children}</ScenarioContext.Provider>;

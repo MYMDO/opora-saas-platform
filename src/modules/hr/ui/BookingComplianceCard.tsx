@@ -1,177 +1,55 @@
 import { useState, type CSSProperties } from 'react';
-import { AlertTriangle, CheckCircle2, UserCheck } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Plus,
+  RotateCcw,
+  Trash2,
+  UserCheck,
+} from 'lucide-react';
 import { Eyebrow, ProgressBar } from '../../../design-system/components';
 import { formatNumberUa } from '../../../lib/format';
-import { DEMO_EMPLOYEE_SALARY_UAH, DEMO_ENTERPRISE } from '../data/fixtures';
 import {
-  assessEmployeeBooking,
+  assessBookingRoster,
   quotaSlots,
   remainingBookingSlots,
+  salaryThreshold,
   type BookingBlocker,
   type EnterpriseBookingContext,
-} from '../domain/booking';
-import type { TerritoryType } from '../domain/rules';
+} from '../index';
+import { useScenario } from '../../../app/scenario';
+
+const inputStyle: CSSProperties = {
+  padding: '7px 10px',
+  borderRadius: 6,
+  fontSize: 12.5,
+};
+
+const resetButtonStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
+  borderRadius: 6,
+  padding: '4px 8px',
+  cursor: 'pointer',
+  color: 'var(--text-mute)',
+  fontSize: 11,
+  flexShrink: 0,
+};
 
 function blockerText(b: BookingBlocker): string {
   switch (b.kind) {
     case 'critical-status-missing':
-      return 'Компанія не має статусу критично важливого підприємства.';
+      return 'Немає статусу критично важливого підприємства';
     case 'tax-debt':
-      return 'Наявна заборгованість зі сплати податків та ЄСВ.';
+      return 'Заборгованість з податків та ЄСВ';
     case 'salary-below-threshold':
-      return `Зарплата ${formatNumberUa(b.actualUah)} ₴ нижча за поріг ${formatNumberUa(b.requiredUah)} ₴.`;
+      return `Зарплата нижча за поріг ${formatNumberUa(b.requiredUah)} ₴`;
     case 'quota-exhausted':
-      return `Ліміт бронювання вичерпано (${b.limitSlots} з ${b.limitSlots} місць).`;
+      return 'Ліміт бронювання вичерпано';
   }
-}
-
-const inputStyle: CSSProperties = {
-  padding: '8px 10px',
-  borderRadius: 6,
-  fontSize: 13,
-};
-
-export function BookingComplianceCard() {
-  const [ctx, setCtx] = useState<EnterpriseBookingContext>(DEMO_ENTERPRISE);
-  const [salaryUah, setSalaryUah] = useState(DEMO_EMPLOYEE_SALARY_UAH);
-
-  const assessment = assessEmployeeBooking({ monthlySalaryUah: salaryUah }, ctx);
-  const slots = quotaSlots(ctx);
-  const remaining = remainingBookingSlots(ctx);
-
-  function patch(partial: Partial<EnterpriseBookingContext>) {
-    setCtx((prev) => ({ ...prev, ...partial }));
-  }
-
-  return (
-    <div className="panel" style={{ padding: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <UserCheck size={14} color="var(--ai)" />
-        <Eyebrow color="var(--ai)">Соломія · Бронювання від мобілізації</Eyebrow>
-      </div>
-      <div className="f-display" style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>
-        Калькулятор відповідності (КМУ №692)
-      </div>
-      <div style={{ fontSize: 11.5, color: 'var(--text-mute)', marginBottom: 14 }}>
-        Поріг зарплати — {formatNumberUa(assessment.requiredSalaryThresholdUah)} ₴ · розгляд заявки до{' '}
-        10 днів
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16 }} className="opora-grid-2">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <label style={{ fontSize: 12.5, display: 'flex', flexDirection: 'column', gap: 5 }}>
-            Місячна зарплата працівника, ₴
-            <input
-              type="number"
-              className="input-row"
-              value={salaryUah}
-              min={0}
-              onChange={(e) => setSalaryUah(Math.max(0, Number(e.target.value) || 0))}
-              style={inputStyle}
-            />
-          </label>
-
-          <label style={{ fontSize: 12.5, display: 'flex', flexDirection: 'column', gap: 5 }}>
-            Територія
-            <select
-              value={ctx.territoryType}
-              onChange={(e) => patch({ territoryType: e.target.value as TerritoryType })}
-              className="input-row"
-              style={inputStyle}
-            >
-              <option value="regular">Звичайна територія</option>
-              <option value="frontline">Прифронтова територія</option>
-            </select>
-          </label>
-
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            <Checkbox
-              label="Критично важливе підприємство"
-              checked={ctx.hasCriticalEnterpriseStatus}
-              onChange={(v) => patch({ hasCriticalEnterpriseStatus: v })}
-            />
-            <Checkbox
-              label="Заборгованість з податків/ЄСВ"
-              checked={ctx.hasTaxDebt}
-              onChange={(v) => patch({ hasTaxDebt: v })}
-            />
-            <Checkbox
-              label="Критична галузь (ліміт 100%)"
-              checked={ctx.isCriticalIndustry}
-              onChange={(v) => patch({ isCriticalIndustry: v })}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            <label style={{ fontSize: 12.5, flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-              Військовозобов'язаних
-              <input
-                type="number"
-                className="input-row"
-                value={ctx.militaryObligatedCount}
-                min={0}
-                onChange={(e) => patch({ militaryObligatedCount: Math.max(0, Number(e.target.value) || 0) })}
-                style={inputStyle}
-              />
-            </label>
-            <label style={{ fontSize: 12.5, flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-              Вже заброньовано
-              <input
-                type="number"
-                className="input-row"
-                value={ctx.alreadyBookedCount}
-                min={0}
-                onChange={(e) => patch({ alreadyBookedCount: Math.max(0, Number(e.target.value) || 0) })}
-                style={inputStyle}
-              />
-            </label>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div
-            className="chip f-mono"
-            style={{
-              alignSelf: 'flex-start',
-              fontSize: 13,
-              padding: '6px 12px',
-              background: assessment.eligible ? 'var(--finance-dim)' : 'var(--danger-dim)',
-              color: assessment.eligible ? 'var(--finance)' : 'var(--danger)',
-            }}
-          >
-            {assessment.eligible ? 'Можна бронювати' : 'Є перешкоди'}
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 5 }}>
-              <span>Ліміт бронювання</span>
-              <span className="f-mono" style={{ color: 'var(--text-dim)' }}>
-                {formatNumberUa(ctx.alreadyBookedCount)} / {formatNumberUa(slots)} місць
-              </span>
-            </div>
-            <ProgressBar used={ctx.alreadyBookedCount} limit={Math.max(slots, 1)} />
-            <div style={{ fontSize: 11, color: 'var(--text-mute)', marginTop: 4 }}>
-              Вільних місць: {remaining}
-            </div>
-          </div>
-
-          {assessment.blockers.length === 0 ? (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: 'var(--text-dim)' }}>
-              <CheckCircle2 size={15} color="var(--finance)" style={{ marginTop: 1, flexShrink: 0 }} />
-              Усі умови КМУ №692 виконано — заявку можна подавати.
-            </div>
-          ) : (
-            assessment.blockers.map((b) => (
-              <div key={b.kind} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: 'var(--text-dim)' }}>
-                <AlertTriangle size={15} color="var(--danger)" style={{ marginTop: 1, flexShrink: 0 }} />
-                {blockerText(b)}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function Checkbox({
@@ -193,5 +71,275 @@ function Checkbox({
       />
       {label}
     </label>
+  );
+}
+
+export function BookingComplianceCard() {
+  const { scenario, updateEnterprise, addEmployee, updateEmployee, removeEmployee, resetScenario } =
+    useScenario();
+  const { enterprise, employees } = scenario.hr;
+  const [newName, setNewName] = useState('');
+  const [newSalaryUah, setNewSalaryUah] = useState(26_000);
+
+  const roster = assessBookingRoster(employees, enterprise);
+  const slots = quotaSlots(enterprise);
+  const remaining = remainingBookingSlots(enterprise);
+  const threshold = salaryThreshold(enterprise);
+
+  function submitEmployee() {
+    if (!newName.trim()) return;
+    addEmployee(newName, newSalaryUah);
+    setNewName('');
+  }
+
+  return (
+    <div className="panel" style={{ padding: 18 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <UserCheck size={14} color="var(--ai)" />
+          <Eyebrow color="var(--ai)">Соломія · Бронювання від мобілізації</Eyebrow>
+        </div>
+        <button
+          onClick={resetScenario}
+          title="Повернути демо-дані"
+          aria-label="Скинути сценарій"
+          style={resetButtonStyle}
+        >
+          <RotateCcw size={11} /> Скинути
+        </button>
+      </div>
+      <div className="f-display" style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>
+        Реєстр працівників і відповідність (КМУ №692)
+      </div>
+      <div style={{ fontSize: 11.5, color: 'var(--text-mute)', marginBottom: 14 }}>
+        Поріг зарплати — {formatNumberUa(threshold)} ₴ · розгляд заявки до 10 днів
+      </div>
+
+      <div
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.2fr)', gap: 16 }}
+        className="opora-grid-2"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <label style={{ fontSize: 12.5, display: 'flex', flexDirection: 'column', gap: 5 }}>
+            Територія
+            <select
+              value={enterprise.territoryType}
+              onChange={(e) =>
+                updateEnterprise({
+                  territoryType: e.target.value as EnterpriseBookingContext['territoryType'],
+                })
+              }
+              className="input-row"
+              style={inputStyle}
+            >
+              <option value="regular">Звичайна територія</option>
+              <option value="frontline">Прифронтова територія</option>
+            </select>
+          </label>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Checkbox
+              label="Критично важливе підприємство"
+              checked={enterprise.hasCriticalEnterpriseStatus}
+              onChange={(v) => updateEnterprise({ hasCriticalEnterpriseStatus: v })}
+            />
+            <Checkbox
+              label="Заборгованість з податків/ЄСВ"
+              checked={enterprise.hasTaxDebt}
+              onChange={(v) => updateEnterprise({ hasTaxDebt: v })}
+            />
+            <Checkbox
+              label="Критична галузь (ліміт 100%)"
+              checked={enterprise.isCriticalIndustry}
+              onChange={(v) => updateEnterprise({ isCriticalIndustry: v })}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <label style={{ fontSize: 12.5, flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+              Військовозобов'язаних
+              <input
+                type="number"
+                className="input-row"
+                value={enterprise.militaryObligatedCount}
+                min={0}
+                onChange={(e) =>
+                  updateEnterprise({ militaryObligatedCount: Math.max(0, Number(e.target.value) || 0) })
+                }
+                style={inputStyle}
+              />
+            </label>
+            <label style={{ fontSize: 12.5, flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+              Вже заброньовано
+              <input
+                type="number"
+                className="input-row"
+                value={enterprise.alreadyBookedCount}
+                min={0}
+                onChange={(e) =>
+                  updateEnterprise({ alreadyBookedCount: Math.max(0, Number(e.target.value) || 0) })
+                }
+                style={inputStyle}
+              />
+            </label>
+          </div>
+
+          <div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 12.5,
+                marginBottom: 5,
+              }}
+            >
+              <span>Ліміт бронювання</span>
+              <span className="f-mono" style={{ color: 'var(--text-dim)' }}>
+                {formatNumberUa(enterprise.alreadyBookedCount)} / {formatNumberUa(slots)} місць
+              </span>
+            </div>
+            <ProgressBar used={enterprise.alreadyBookedCount} limit={Math.max(slots, 1)} />
+            <div style={{ fontSize: 11, color: 'var(--text-mute)', marginTop: 4 }}>
+              Вільних місць: {remaining}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+          <span
+            className="chip f-mono"
+            style={{
+              alignSelf: 'flex-start',
+              fontSize: 13,
+              padding: '6px 12px',
+              background: roster.eligibleCount > 0 ? 'var(--finance-dim)' : 'var(--danger-dim)',
+              color: roster.eligibleCount > 0 ? 'var(--finance)' : 'var(--danger)',
+            }}
+          >
+            Можна бронювати: {roster.eligibleCount} з {employees.length}
+          </span>
+
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              maxHeight: 260,
+              overflowY: 'auto',
+              paddingRight: 2,
+            }}
+          >
+            {roster.rows.map((row) => (
+              <div key={row.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  className="input-row"
+                  value={
+                    employees.find((e) => e.id === row.id)?.name ?? row.name
+                  }
+                  onChange={(e) => updateEmployee(row.id, { name: e.target.value })}
+                  aria-label={`Імʼя працівника ${row.name}`}
+                  style={{ ...inputStyle, flex: '1 1 130px', minWidth: 0 }}
+                />
+                <input
+                  type="number"
+                  className="input-row"
+                  value={row.monthlySalaryUah}
+                  min={0}
+                  step={500}
+                  onChange={(e) =>
+                    updateEmployee(row.id, {
+                      monthlySalaryUah: Math.max(0, Number(e.target.value) || 0),
+                    })
+                  }
+                  aria-label={`Зарплата, ${row.name}`}
+                  title="Місячна зарплата, ₴"
+                  style={{ ...inputStyle, width: 104, flexShrink: 0 }}
+                />
+                <span
+                  className="chip f-mono"
+                  title={row.eligible ? undefined : blockerText(row.blockers[0])}
+                  style={{
+                    flexShrink: 0,
+                    background: row.eligible ? 'var(--finance-dim)' : 'var(--danger-dim)',
+                    color: row.eligible ? 'var(--finance)' : 'var(--danger)',
+                    cursor: row.eligible ? 'default' : 'help',
+                  }}
+                >
+                  {row.eligible ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+                </span>
+                <button
+                  onClick={() => removeEmployee(row.id)}
+                  aria-label={`Видалити ${row.name}`}
+                  title="Видалити працівника"
+                  style={{
+                    background: 'none',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    padding: 6,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: 'var(--text-mute)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="input-row"
+              placeholder="Новий працівник…"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitEmployee();
+              }}
+              aria-label="Імʼя нового працівника"
+              style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+            />
+            <input
+              type="number"
+              className="input-row"
+              value={newSalaryUah}
+              min={0}
+              step={500}
+              onChange={(e) => setNewSalaryUah(Math.max(0, Number(e.target.value) || 0))}
+              aria-label="Зарплата нового працівника"
+              title="Місячна зарплата, ₴"
+              style={{ ...inputStyle, width: 104, flexShrink: 0 }}
+            />
+            <button
+              onClick={submitEmployee}
+              disabled={!newName.trim()}
+              aria-label="Додати працівника"
+              style={{
+                background: newName.trim() ? 'var(--ai)' : 'var(--surface-2)',
+                border: 'none',
+                borderRadius: 6,
+                padding: '0 12px',
+                cursor: newName.trim() ? 'pointer' : 'default',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#0E1213',
+                flexShrink: 0,
+              }}
+            >
+              <Plus size={15} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
