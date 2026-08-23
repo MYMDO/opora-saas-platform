@@ -39,3 +39,13 @@ export function computePaybackYears(investmentUah: number, dailySavingsUah: numb
   if (dailySavingsUah <= 0 || investmentUah <= 0) return null;
   return investmentUah / dailySavingsUah / 365;
 }
+
+export function computeBreakEvenDischargeUahPerKwh(
+  params: Pick<
+    ArbitrageParams,
+    'chargePriceUahPerKwh' | 'roundTripEfficiencyPercent' | 'degradationCostUahPerKwh'
+  >,
+): number {
+  const eta = params.roundTripEfficiencyPercent / 100;
+  return params.chargePriceUahPerKwh / eta + params.degradationCostUahPerKwh;
+}

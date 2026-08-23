@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeBreakEvenDischargeUahPerKwh,
   computeDailySavingsUah,
   computePaybackYears,
   DEFAULT_ARBITRAGE,
@@ -9,6 +10,28 @@ const base: Parameters<typeof computeDailySavingsUah>[number] = {
   ...DEFAULT_ARBITRAGE,
   batteryCapacityKwh: 1600,
 };
+
+describe('computeBreakEvenDischargeUahPerKwh', () => {
+  it('equals charging losses plus degradation cost', () => {
+    const be = computeBreakEvenDischargeUahPerKwh(base);
+    expect(be).toBeCloseTo(2.5 / 0.92 + 0.53, 9);
+  });
+
+  it('is the exact threshold where daily savings hit zero', () => {
+    const be = computeBreakEvenDischargeUahPerKwh(base);
+    expect(computeDailySavingsUah({ ...base, dischargePriceUahPerKwh: be })).toBe(0);
+  });
+
+  it('rises with the night tariff and efficiency losses', () => {
+    const cheaperNight = computeBreakEvenDischargeUahPerKwh({ ...base, chargePriceUahPerKwh: 2 });
+    expect(cheaperNight).toBeLessThan(computeBreakEvenDischargeUahPerKwh(base));
+    const worseEta = computeBreakEvenDischargeUahPerKwh({
+      ...base,
+      roundTripEfficiencyPercent: 80,
+    });
+    expect(worseEta).toBeGreaterThan(computeBreakEvenDischargeUahPerKwh(base));
+  });
+});
 
 describe('computeDailySavingsUah', () => {
   it('reproduces the demo case: 1600 kWh, 80% DoD, 92% efficiency, 2 cycles', () => {

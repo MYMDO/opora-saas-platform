@@ -14,10 +14,14 @@ export interface EnergySnapshot {
   readonly paybackYears: number | null;
 }
 
-export function getEnergySnapshot(): EnergySnapshot {
+export function getEnergySnapshot(
+  overrides: Partial<ArbitrageParams> = {},
+  investmentUah: number = DEMO_BESS_INVESTMENT_UAH,
+): EnergySnapshot {
   const params: ArbitrageParams = {
     ...DEFAULT_ARBITRAGE,
     batteryCapacityKwh: DEMO_BESS.capacityKwh,
+    ...overrides,
   };
   const savedTodayUah = computeDailySavingsUah(params);
   return {
@@ -25,11 +29,18 @@ export function getEnergySnapshot(): EnergySnapshot {
     capacityLabel: `${DEMO_BESS.powerKw} кВт / ${DEMO_BESS.capacityKwh} кВт·год`,
     generationTodayKwh: DEMO_BESS.generationTodayKwh,
     savedTodayUah,
-    paybackYears: computePaybackYears(DEMO_BESS_INVESTMENT_UAH, savedTodayUah),
+    paybackYears: computePaybackYears(investmentUah, savedTodayUah),
   };
 }
 
-export { MARKET_TARIFFS, DEFAULT_ARBITRAGE, computeDailySavingsUah, computePaybackYears } from './domain/arbitrage';
+export {
+  MARKET_TARIFFS,
+  DEFAULT_ARBITRAGE,
+  computeDailySavingsUah,
+  computePaybackYears,
+  computeBreakEvenDischargeUahPerKwh,
+} from './domain/arbitrage';
+export type { ArbitrageParams } from './domain/arbitrage';
 export {
   DEMO_BESS,
   DEMO_BESS_INVESTMENT_UAH,
