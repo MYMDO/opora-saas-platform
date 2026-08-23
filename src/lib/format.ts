@@ -13,3 +13,8 @@ export function formatTimeUa(date: Date): string {
 export function formatDecimalUa(value: number, digits = 1): string {
   return value.toFixed(digits).replace('.', ',');
 }
+
+export function formatDateUa(isoDate: string): string {
+  const [y = '', m = '', d = ''] = isoDate.split('-');
+  return [d, m, y].filter(Boolean).join('.');
+}

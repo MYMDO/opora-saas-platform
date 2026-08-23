@@ -77,6 +77,10 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    document.title = `${NAV.find((n) => n.id === tab)?.label ?? 'Огляд'} · ОПОРА`;
+  }, [tab]);
+
   const { scenario } = useScenario();
   const finance = getFinanceSnapshot(scenario.finance);
   const energy = getEnergySnapshot();

@@ -27,24 +27,8 @@ import {
 import { formatDecimalUa, formatNumberUa } from '../../../lib/format';
 import { useScenario } from '../../../app/scenario';
 
-const resetButtonStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 5,
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border)',
-  borderRadius: 6,
-  padding: '4px 8px',
-  cursor: 'pointer',
-  color: 'var(--text-mute)',
-  fontSize: 11,
-  flexShrink: 0,
-};
-
 const inputStyle: CSSProperties = {
-  padding: '8px 10px',
-  borderRadius: 6,
-  fontSize: 13,
+  fontSize: 12.5,
 };
 
 function ArbitrageRow({ label, value, color }: { label: string; value: string; color: string }) {
@@ -197,7 +181,7 @@ export function EnergyPage() {
           }}
         >
           <Eyebrow color="var(--ai)">Інтерактивна модель</Eyebrow>
-          <button onClick={resetScenario} title="Повернути демо-дані" aria-label="Скинути сценарій" style={resetButtonStyle}>
+          <button onClick={resetScenario} title="Повернути демо-дані" aria-label="Скинути сценарій" className="btn btn-ghost">
             <RotateCcw size={11} /> Скинути
           </button>
         </div>

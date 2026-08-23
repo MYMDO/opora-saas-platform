@@ -17,7 +17,7 @@ export function KpiCard({
   dim: string;
 }) {
   return (
-    <div className="panel fade-in" style={{ padding: 16, flex: 1, minWidth: 200 }}>
+    <div className="panel fade-in hoverable" style={{ padding: 16, flex: 1, minWidth: 200 }}>
       <div
         style={{
           display: 'flex',

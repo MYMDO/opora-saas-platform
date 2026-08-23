@@ -20,23 +20,7 @@ import {
 import { useScenario } from '../../../app/scenario';
 
 const inputStyle: CSSProperties = {
-  padding: '7px 10px',
-  borderRadius: 6,
   fontSize: 12.5,
-};
-
-const resetButtonStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 5,
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border)',
-  borderRadius: 6,
-  padding: '4px 8px',
-  cursor: 'pointer',
-  color: 'var(--text-mute)',
-  fontSize: 11,
-  flexShrink: 0,
 };
 
 function blockerText(b: BookingBlocker): string {
@@ -110,7 +94,7 @@ export function BookingComplianceCard() {
           onClick={resetScenario}
           title="Повернути демо-дані"
           aria-label="Скинути сценарій"
-          style={resetButtonStyle}
+          className="btn btn-ghost"
         >
           <RotateCcw size={11} /> Скинути
         </button>
@@ -278,17 +262,8 @@ export function BookingComplianceCard() {
                   onClick={() => removeEmployee(row.id)}
                   aria-label={`Видалити ${row.name}`}
                   title="Видалити працівника"
-                  style={{
-                    background: 'none',
-                    border: '1px solid var(--border)',
-                    borderRadius: 6,
-                    padding: 6,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    color: 'var(--text-mute)',
-                    flexShrink: 0,
-                  }}
+                  className="btn btn-icon"
+                  style={{ flexShrink: 0 }}
                 >
                   <Trash2 size={13} />
                 </button>
@@ -323,17 +298,8 @@ export function BookingComplianceCard() {
               onClick={submitEmployee}
               disabled={!newName.trim()}
               aria-label="Додати працівника"
-              style={{
-                background: newName.trim() ? 'var(--ai)' : 'var(--surface-2)',
-                border: 'none',
-                borderRadius: 6,
-                padding: '0 12px',
-                cursor: newName.trim() ? 'pointer' : 'default',
-                display: 'flex',
-                alignItems: 'center',
-                color: '#0E1213',
-                flexShrink: 0,
-              }}
+              className={`btn ${newName.trim() ? 'btn-solid' : 'btn-surface'}`}
+              style={{ padding: '0 12px', flexShrink: 0 }}
             >
               <Plus size={15} />
             </button>

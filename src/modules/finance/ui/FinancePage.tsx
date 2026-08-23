@@ -10,30 +10,14 @@ import {
   YAxis,
 } from 'recharts';
 import { ChartTooltip, Eyebrow, KpiCard, ProgressBar } from '../../../design-system/components';
-import { formatDecimalUa, formatNumberUa } from '../../../lib/format';
+import { formatDecimalUa, formatDateUa, formatNumberUa } from '../../../lib/format';
 import { getFinanceSnapshot, VAT_RULES } from '../index';
 import { useScenario } from '../../../app/scenario';
 import { RotateCcw } from 'lucide-react';
 import { RISK_TREND } from '../data/fixtures';
 
 const inputStyle: CSSProperties = {
-  padding: '7px 10px',
-  borderRadius: 6,
   fontSize: 12.5,
-};
-
-const resetButtonStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 5,
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border)',
-  borderRadius: 6,
-  padding: '4px 8px',
-  cursor: 'pointer',
-  color: 'var(--text-mute)',
-  fontSize: 11,
-  flexShrink: 0,
 };
 
 function DeadlineList({
@@ -58,7 +42,7 @@ function DeadlineList({
           >
             <div>
               <div style={{ fontSize: 12.5 }}>{d.title}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-mute)' }}>{d.dueDateIso}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-mute)' }}>{formatDateUa(d.dueDateIso)}</div>
             </div>
             <span
               className="chip f-mono"
@@ -158,7 +142,7 @@ export function FinancePage() {
               onClick={resetScenario}
               title="Повернути демо-дані"
               aria-label="Скинути сценарій"
-              style={resetButtonStyle}
+              className="btn btn-ghost"
             >
               <RotateCcw size={11} /> Скинути
             </button>
@@ -215,16 +199,7 @@ export function FinancePage() {
                     onClick={() => removeContractor(i)}
                     aria-label={`Видалити ${c.name}`}
                     title="Видалити контрагента"
-                    style={{
-                      background: 'none',
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      padding: 6,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: 'var(--text-mute)',
-                    }}
+                    className="btn btn-icon"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -252,16 +227,8 @@ export function FinancePage() {
               onClick={submitNew}
               disabled={!newName.trim()}
               aria-label="Додати контрагента"
-              style={{
-                background: newName.trim() ? 'var(--finance)' : 'var(--surface-2)',
-                border: 'none',
-                borderRadius: 6,
-                padding: '0 12px',
-                cursor: newName.trim() ? 'pointer' : 'default',
-                display: 'flex',
-                alignItems: 'center',
-                color: '#0E1213',
-              }}
+              className="btn btn-finance"
+              style={{ padding: '0 12px' }}
             >
               <Plus size={15} />
             </button>

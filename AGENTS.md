@@ -30,4 +30,5 @@
 
 - All product copy is **Ukrainian**; use `uk-UA` formatting via helpers in `src/lib/format.ts` (never raw `toLocaleString` scattered around). Keep new UI text in Ukrainian.
 - Preserve the module→color mapping from `tokens.css`: AI `--ai` (teal), Energy `--energy` (amber), Finance `--finance` (green), plus `--danger` (red); dark theme `--bg: #14171A`; fonts IBM Plex (Sans / Sans Condensed for display / Mono) loaded in `index.html`.
+- Shared control styles live in `tokens.css`: `.btn` variants (`btn-solid`, `btn-finance`, `btn-surface`, `btn-icon`, `btn-ghost`) and `.input-row` (incl. styled `select`). Prefer them over bespoke inline button/input styles; dates render via `formatDateUa`, never raw ISO strings.
 - No comments in code unless asked; domain constants carry legal meaning through naming (e.g., `VAT_RULES`) — keep names precise.

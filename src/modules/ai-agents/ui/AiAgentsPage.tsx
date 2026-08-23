@@ -126,7 +126,15 @@ export function AiAgentsPage() {
           </div>
         </div>
 
-        <div className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', height: 360 }}>
+        <div
+          className="panel"
+          style={{
+            padding: 18,
+            display: 'flex',
+            flexDirection: 'column',
+            height: 'clamp(340px, 46vh, 480px)',
+          }}
+        >
           <Eyebrow>Тестова розмова з агентом «{agent.name}»</Eyebrow>
           <div
             ref={scrollRef}
@@ -179,17 +187,10 @@ export function AiAgentsPage() {
             <button
               onClick={send}
               aria-label="Надіслати"
-              style={{
-                background: 'var(--ai)',
-                border: 'none',
-                borderRadius: 6,
-                padding: '0 14px',
-                display: 'flex',
-                alignItems: 'center',
-                cursor: 'pointer',
-              }}
+              className="btn btn-solid"
+              style={{ padding: '0 14px' }}
             >
-              <Send size={15} color="#0E1213" />
+              <Send size={15} />
             </button>
           </div>
         </div>
