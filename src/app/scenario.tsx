@@ -53,6 +53,12 @@ function toFiniteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+function safeId(raw: unknown): string {
+  return typeof raw === 'string' && ID_RE.test(raw) ? raw : crypto.randomUUID();
+}
+
 function loadInitial(): AppScenario {
   const d = defaults();
   try {
@@ -76,7 +82,7 @@ function loadInitial(): AppScenario {
                 Number.isFinite(r.limitUah),
             )
             .map((r) => ({
-              id: typeof r.id === 'string' && r.id ? r.id : crypto.randomUUID(),
+              id: safeId(r.id),
               name: String(r.name),
               usedUah: Number(r.usedUah),
               limitUah: Number(r.limitUah),
@@ -104,7 +110,7 @@ function loadInitial(): AppScenario {
               Number.isFinite(r.monthlySalaryUah),
           )
           .map((r) => ({
-            id: String(r.id),
+            id: safeId(r.id),
             name: String(r.name),
             monthlySalaryUah: Number(r.monthlySalaryUah),
           }))

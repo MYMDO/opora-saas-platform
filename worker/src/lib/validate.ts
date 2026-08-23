@@ -6,7 +6,7 @@ const uahInt = z.coerce.number().int().min(0).max(MAX_UAH);
 
 const clientUuid = z
   .string()
-  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Має бути UUID');
+  .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, 'Дозволені літери, цифри, «_», «-» (до 64 символів)');
 
 export const contractorCreateSchema = z.object({
   id: clientUuid.optional(),
