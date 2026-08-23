@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import { Dot, Eyebrow } from '../../../design-system/components';
 import { formatNumberUa } from '../../../lib/format';
-import { AGENTS, CANNED, getAgent } from '../index';
+import { AGENTS, buildAssistantReply, CANNED, getAgent } from '../index';
+import { getFinanceSnapshot } from '../../finance/index';
+import { getEnergySnapshot } from '../../energy/index';
+import { assessBookingRoster, remainingBookingSlots } from '../../hr/index';
+import { useScenario } from '../../../app/scenario';
 import { BookingComplianceCard } from '../../hr';
 
 interface ChatMessage {
@@ -11,6 +15,7 @@ interface ChatMessage {
 }
 
 export function AiAgentsPage() {
+  const { scenario } = useScenario();
   const [selected, setSelected] = useState('hanna');
   const [messages, setMessages] = useState<ChatMessage[]>([{ from: 'bot', text: CANNED.hanna[0] }]);
   const [input, setInput] = useState('');
@@ -27,6 +32,16 @@ export function AiAgentsPage() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, typing]);
 
+  function buildContext() {
+    const roster = assessBookingRoster(scenario.hr.employees, scenario.hr.enterprise);
+    return {
+      finance: getFinanceSnapshot(scenario.finance),
+      energy: getEnergySnapshot(),
+      roster: { eligibleCount: roster.eligibleCount, total: roster.rows.length },
+      bookingRemainingSlots: remainingBookingSlots(scenario.hr.enterprise),
+    };
+  }
+
   function send() {
     const text = input.trim();
     if (!text) return;
@@ -35,8 +50,14 @@ export function AiAgentsPage() {
     setTyping(true);
     setTimeout(() => {
       const bank = CANNED[selected];
-      const reply = bank[turnRef.current % bank.length];
+      const fallback = bank[turnRef.current % bank.length];
       turnRef.current += 1;
+      const reply = buildAssistantReply(
+        { id: selected, name: getAgent(selected).name },
+        text,
+        buildContext(),
+        fallback,
+      );
       setMessages((m) => [...m, { from: 'bot', text: reply }]);
       setTyping(false);
     }, 850);
