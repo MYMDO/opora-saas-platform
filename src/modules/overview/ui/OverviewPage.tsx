@@ -1,6 +1,17 @@
-import { BatteryCharging, Bot, ShieldCheck, Wallet } from 'lucide-react';
-import { Area, Bar, BarChart, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { AlertRow, ChartTooltip, Eyebrow, KpiCard, type AlertLevel } from '../../../design-system/components';
+import { BatteryCharging, Bot, CheckCircle2, ShieldCheck, Wallet } from 'lucide-react';
+import {
+  Area,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { ChartTooltip, Dot, Eyebrow, KpiCard } from '../../../design-system/components';
 import { formatNumberUa } from '../../../lib/format';
 import { AI_WEEK, TODAY_AI_RESOLVED } from '../../ai-agents/index';
 import { ENERGY_24H, getEnergySnapshot } from '../../energy/index';
@@ -10,6 +21,73 @@ import {
   DEMO_PLAN_ID,
   DEMO_RESOLUTIONS_THIS_MONTH,
 } from '../../billing/index';
+import { DEMO_ENTERPRISE } from '../../hr/index';
+import { buildDailyActions, MODULE_LABELS, type DailyAction } from '../domain/actions';
+
+const SEVERITY_STYLE = {
+  danger: { color: 'var(--danger)', dim: 'var(--danger-dim)' },
+  warning: { color: 'var(--energy)', dim: 'var(--energy-dim)' },
+  info: { color: 'var(--ai)', dim: 'var(--ai-dim)' },
+  ok: { color: 'var(--finance)', dim: 'var(--finance-dim)' },
+} as const;
+
+function ActionCard({ action }: { action: DailyAction }) {
+  const s = SEVERITY_STYLE[action.severity];
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 12,
+        padding: '12px 0',
+        borderBottom: '1px solid var(--border)',
+        alignItems: 'flex-start',
+      }}
+    >
+      <Dot color={s.color} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, color: 'var(--text)', fontWeight: 500, lineHeight: 1.4 }}>
+          {action.title}
+        </div>
+        {action.detail && (
+          <div style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 3, lineHeight: 1.45 }}>
+            {action.detail}
+          </div>
+        )}
+        <div className="f-mono" style={{ fontSize: 10.5, color: 'var(--text-mute)', marginTop: 4 }}>
+          {MODULE_LABELS[action.module]}
+        </div>
+      </div>
+      {action.dueLabel && (
+        <span
+          className="chip f-mono"
+          style={{ background: s.dim, color: s.color, flexShrink: 0 }}
+        >
+          {action.dueLabel}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CalmState({ compact }: { compact?: boolean }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 10,
+        alignItems: 'center',
+        padding: compact ? '8px 0' : '18px 0',
+        color: 'var(--text-dim)',
+        fontSize: 13,
+      }}
+    >
+      <CheckCircle2 size={16} color="var(--finance)" />
+      {compact
+        ? 'Інших сигналів немає.'
+        : 'Критичних сигналів немає — операційна стійкість під контролем.'}
+    </div>
+  );
+}
 
 function BillingRow({ label, value, note, color }: { label: string; value: string; note: string; color: string }) {
   return (
@@ -28,36 +106,19 @@ function BillingRow({ label, value, note, color }: { label: string; value: strin
   );
 }
 
-function buildAlerts(): Array<{ level: AlertLevel; text: string }> {
-  const finance = getFinanceSnapshot();
-  const energy = getEnergySnapshot();
-  const dangerContractor = finance.contractors.find((c) => c.level === 'danger');
-  const alerts: Array<{ level: AlertLevel; text: string } | undefined> = [
-    dangerContractor && {
-      level: 'danger' as const,
-      text: `${dangerContractor.name} — ${formatNumberUa(dangerContractor.usedUah)} ₴ з ліміту ${formatNumberUa(dangerContractor.limitUah)} ₴ на контрагента. Ризик блокування ПН.`,
-    },
-    finance.risk.label === 'високий'
-      ? {
-          level: 'warning' as const,
-          text: `Податковий ризик ${finance.risk.scorePercent}% — перевірте ліміти ПН до кінця місяця.`,
-        }
-      : undefined,
-    {
-      level: 'warning' as const,
-      text: `Батарея BESS зарядилась до ${energy.socPercent}% — доступний резерв для вечірнього піку.`,
-    },
-    {
-      level: 'ok' as const,
-      text: `Агент «Ганна» закрила ${formatNumberUa(155)} звернень сьогодні без жодної ескалації.`,
-    },
-  ];
-  return alerts.filter((a): a is NonNullable<typeof a> => a != null);
-}
-
 export function OverviewPage() {
   const finance = getFinanceSnapshot();
   const energy = getEnergySnapshot();
+
+  const actions = buildDailyActions({
+    finance,
+    batterySocPercent: energy.socPercent,
+    booking: DEMO_ENTERPRISE,
+    aiResolvedToday: TODAY_AI_RESOLVED,
+  });
+  const topActions = actions.slice(0, 3);
+  const restActions = actions.slice(3);
+
   const monthlySavingsUah = Math.round((energy.savedTodayUah * 365) / 12);
   const bill = computeMonthlyBill(DEMO_PLAN_ID, {
     resolutionsThisMonth: DEMO_RESOLUTIONS_THIS_MONTH,
@@ -94,6 +155,15 @@ export function OverviewPage() {
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="panel" style={{ padding: 18 }}>
+        <Eyebrow>Сьогодні варто зробити</Eyebrow>
+        {topActions.length === 0 ? (
+          <CalmState />
+        ) : (
+          topActions.map((a) => <ActionCard key={a.id} action={a} />)
+        )}
+      </div>
+
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <KpiCard
           icon={Bot}
@@ -130,7 +200,11 @@ export function OverviewPage() {
       </div>
 
       <div
-        style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 16 }}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)',
+          gap: 16,
+        }}
         className="opora-grid-2"
       >
         <div className="panel" style={{ padding: 18 }}>
@@ -157,9 +231,11 @@ export function OverviewPage() {
         <div className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column' }}>
           <Eyebrow>Стрічка подій</Eyebrow>
           <div style={{ flex: 1 }}>
-            {buildAlerts().map((a) => (
-              <AlertRow key={a.text} level={a.level} text={a.text} />
-            ))}
+            {restActions.length === 0 ? (
+              <CalmState compact />
+            ) : (
+              restActions.map((a) => <ActionCard key={a.id} action={a} />)
+            )}
           </div>
         </div>
       </div>
