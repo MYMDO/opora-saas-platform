@@ -1,9 +1,9 @@
 import type { ContractorRow } from '../modules/finance/index';
 import type { EmployeeRow, EnterpriseBookingContext } from '../modules/hr/index';
 
+/** Порожньо = same-origin (Pages Functions /v1/*). Перевизначається через VITE_API_BASE. */
 export const API_BASE_URL: string =
-  (import.meta.env?.VITE_API_BASE as string | undefined) ??
-  'https://opora-api.p4d-b2q.workers.dev';
+  ((import.meta.env?.VITE_API_BASE as string | undefined) ?? '').trim();
 
 const TENANT = 'demo';
 const TIMEOUT_MS = 4_000;
