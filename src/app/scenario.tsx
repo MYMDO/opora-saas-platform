@@ -11,148 +11,21 @@ import {
   removeContractor as removeContractorOp,
   updateContractor as updateContractorOp,
   VAT_RULES,
-  defaultFinanceScenario,
   type ContractorRow,
-  type FinanceScenario,
 } from '../modules/finance/index';
-import {
-  defaultHrScenario,
-  type EmployeeRow,
-  type EnterpriseBookingContext,
-  type HrScenario,
-} from '../modules/hr/index';
-import {
-  DEMO_BESS_INVESTMENT_UAH,
-  type ArbitrageParams,
-} from '../modules/energy/index';
+import type { EmployeeRow, EnterpriseBookingContext } from '../modules/hr/index';
+import type { ArbitrageParams } from '../modules/energy/index';
 import { api } from './api';
 import { executeSeed, reconcile } from './scenario-sync';
+import {
+  defaults,
+  loadInitial,
+  SCENARIO_STORAGE_KEY,
+  type AppScenario,
+  type EnergyScenarioState,
+} from './scenario-storage';
 
-export interface EnergyScenarioState {
-  overrides: Partial<ArbitrageParams>;
-  investmentUah: number;
-}
-
-export interface AppScenario {
-  readonly finance: FinanceScenario;
-  readonly hr: HrScenario;
-  readonly energy: EnergyScenarioState;
-}
-
-export function defaults(): AppScenario {
-  return {
-    finance: defaultFinanceScenario(),
-    hr: defaultHrScenario(),
-    energy: { overrides: {}, investmentUah: DEMO_BESS_INVESTMENT_UAH },
-  };
-}
-
-const STORAGE_KEY = 'opora-scenario-v1';
-
-function toFiniteNumber(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-
-function safeId(raw: unknown): string {
-  return typeof raw === 'string' && ID_RE.test(raw) ? raw : crypto.randomUUID();
-}
-
-function loadInitial(): AppScenario {
-  const d = defaults();
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return d;
-    const parsed = JSON.parse(raw) as Partial<AppScenario> | null;
-
-    const f = parsed?.finance;
-    const finance: FinanceScenario = {
-      adjustmentWindowDays: Math.max(
-        0,
-        toFiniteNumber(f?.adjustmentWindowDays, d.finance.adjustmentWindowDays),
-      ),
-      contractors: Array.isArray(f?.contractors)
-        ? f.contractors
-            .filter(
-              (r): r is ContractorRow =>
-                r != null &&
-                typeof r.name === 'string' &&
-                Number.isFinite(r.usedUah) &&
-                Number.isFinite(r.limitUah),
-            )
-            .map((r) => ({
-              id: safeId(r.id),
-              name: String(r.name),
-              usedUah: Number(r.usedUah),
-              limitUah: Number(r.limitUah),
-            }))
-        : d.finance.contractors,
-    };
-
-    const e = parsed?.hr?.enterprise;
-    const enterprise: EnterpriseBookingContext = {
-      territoryType: e?.territoryType === 'frontline' ? 'frontline' : 'regular',
-      hasCriticalEnterpriseStatus: e?.hasCriticalEnterpriseStatus === true,
-      isCriticalIndustry: e?.isCriticalIndustry === true,
-      hasTaxDebt: e?.hasTaxDebt === true,
-      militaryObligatedCount: Math.max(0, toFiniteNumber(e?.militaryObligatedCount, d.hr.enterprise.militaryObligatedCount)),
-      alreadyBookedCount: Math.max(0, toFiniteNumber(e?.alreadyBookedCount, d.hr.enterprise.alreadyBookedCount)),
-    };
-
-    const employees: ReadonlyArray<EmployeeRow> = Array.isArray(parsed?.hr?.employees)
-      ? parsed.hr.employees
-          .filter(
-            (r): r is EmployeeRow =>
-              r != null &&
-              typeof r.id === 'string' &&
-              typeof r.name === 'string' &&
-              Number.isFinite(r.monthlySalaryUah),
-          )
-          .map((r) => ({
-            id: safeId(r.id),
-            name: String(r.name),
-            monthlySalaryUah: Number(r.monthlySalaryUah),
-          }))
-      : d.hr.employees;
-
-    const energy: EnergyScenarioState = {
-      overrides: sanitizeArbitrageOverrides(parsed?.energy?.overrides),
-      investmentUah: Math.max(
-        0,
-        toFiniteNumber(parsed?.energy?.investmentUah, d.energy.investmentUah),
-      ),
-    };
-
-    return { finance, hr: { employees, enterprise }, energy };
-  } catch {
-    return d;
-  }
-}
-
-function clampNum(v: unknown, min: number, max?: number): number | undefined {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
-  const x = Math.max(min, v);
-  return max == null ? x : Math.min(x, max);
-}
-
-function sanitizeArbitrageOverrides(raw: unknown): Partial<ArbitrageParams> {
-  if (raw == null || typeof raw !== 'object') return {};
-  const s = raw as Record<string, unknown>;
-  const out: Partial<ArbitrageParams> = {};
-  const put = <K extends keyof ArbitrageParams>(key: K, min: number, max?: number, floorInt = false) => {
-    const v = clampNum(s[key as string], min, max);
-    if (v !== undefined) (out[key] as number) = floorInt ? Math.floor(v) : v;
-  };
-  put('batteryCapacityKwh', 0, 1_000_000);
-  put('maxDodPercent', 0, 100);
-  put('roundTripEfficiencyPercent', 20, 100);
-  put('cyclesPerDay', 0, 6, true);
-  put('chargePriceUahPerKwh', 0, 10_000);
-  put('dischargePriceUahPerKwh', 0, 10_000);
-  put('degradationCostUahPerKwh', 0, 10_000);
-  return out;
-}
+export type { AppScenario, EnergyScenarioState };
 
 interface ScenarioContextValue {
   readonly scenario: AppScenario;
@@ -178,7 +51,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(scenario));
+      localStorage.setItem(SCENARIO_STORAGE_KEY, JSON.stringify(scenario));
     } catch {
       // приватний режим або переповнена квота — сценарій лишається лише в памʼяті
     }

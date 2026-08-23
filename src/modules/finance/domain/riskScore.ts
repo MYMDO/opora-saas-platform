@@ -1,4 +1,3 @@
-import { usagePercent } from './taxRules';
 
 export interface TaxRiskInput {
   readonly totalUsedUah: number;
@@ -60,9 +59,3 @@ export function assessTaxRisk(input: TaxRiskInput): TaxRiskAssessment {
   return { scorePercent, label, drivers };
 }
 
-export function contractorsAtRisk<U extends { usedUah: number }>(
-  contractors: ReadonlyArray<U>,
-  perContractorLimitUah: number,
-): U[] {
-  return contractors.filter((c) => usagePercent(c.usedUah, perContractorLimitUah) >= 70);
-}

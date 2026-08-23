@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { BatteryCharging, Bot, CheckCircle2, ShieldCheck, Wallet } from 'lucide-react';
 import {
   Area,
@@ -109,17 +110,20 @@ function BillingRow({ label, value, note, color }: { label: string; value: strin
 
 export function OverviewPage() {
   const { scenario } = useScenario();
-  const finance = getFinanceSnapshot(scenario.finance);
-  const energy = getEnergySnapshot();
+  const finance = useMemo(() => getFinanceSnapshot(scenario.finance), [scenario.finance]);
+  const energy = useMemo(() => getEnergySnapshot(), []);
 
-  const roster = assessBookingRoster(scenario.hr.employees, scenario.hr.enterprise);
-  const actions = buildDailyActions({
+  const roster = useMemo(
+    () => assessBookingRoster(scenario.hr.employees, scenario.hr.enterprise),
+    [scenario.hr.employees, scenario.hr.enterprise],
+  );
+  const actions = useMemo(() => buildDailyActions({
     finance,
     batterySocPercent: energy.socPercent,
     booking: scenario.hr.enterprise,
     aiResolvedToday: TODAY_AI_RESOLVED,
     roster: { eligibleCount: roster.eligibleCount, total: roster.rows.length },
-  });
+  }), [finance, energy.socPercent, scenario.hr, roster.eligibleCount, roster.rows.length]);
   const topActions = actions.slice(0, 3);
   const restActions = actions.slice(3);
 

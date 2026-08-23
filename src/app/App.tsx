@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   Bot,
@@ -92,8 +92,8 @@ export default function App() {
   }, [tab]);
 
   const { scenario, apiOnline, syncError } = useScenario();
-  const finance = getFinanceSnapshot(scenario.finance);
-  const energy = getEnergySnapshot();
+  const finance = useMemo(() => getFinanceSnapshot(scenario.finance), [scenario.finance]);
+  const energy = useMemo(() => getEnergySnapshot(), []);
 
   return (
     <div className="opora-root" style={{ display: 'flex', minHeight: 640 }}>

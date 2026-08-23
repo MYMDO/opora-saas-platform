@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultFinanceScenario } from '../modules/finance/index';
 import { defaultHrScenario } from '../modules/hr/index';
-import { defaults } from './scenario';
+import { defaults } from './scenario-storage';
 import { reconcile } from './scenario-sync';
 
 function localScenario() {

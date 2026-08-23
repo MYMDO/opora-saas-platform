@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { crudRoutes } from '../lib/crud';
 import type { AppEnv } from '../index';
 import {
   employeeCreateSchema,
@@ -8,92 +9,28 @@ import {
   readJson,
 } from '../lib/validate';
 
-interface EmployeeRow {
-  id: string;
-  name: string;
-  monthlySalaryUah: number;
-}
-
-function mapRow(r: Record<string, unknown>): EmployeeRow {
-  return {
-    id: String(r.id),
-    name: String(r.name),
-    monthlySalaryUah: Number(r.monthly_salary_uah),
-  };
-}
-
-const SELECT_COLS = 'id, name, monthly_salary_uah';
+const employeeRoutes = () =>
+  crudRoutes({
+    table: 'employees',
+    columns: 'id, name, monthly_salary_uah',
+    mapRow: (r) => ({
+      id: String(r.id),
+      name: String(r.name),
+      monthlySalaryUah: Number(r.monthly_salary_uah),
+    }),
+    createSchema: employeeCreateSchema,
+    patchSchema: employeePatchSchema,
+    patchColumns: {
+      name: 'name',
+      monthlySalaryUah: 'monthly_salary_uah',
+    },
+    createColumns: (v) => [{ column: 'monthly_salary_uah', value: v.monthlySalaryUah }],
+    notFoundLabel: 'Працівника не знайдено',
+  });
 
 export function hrRoutes() {
   const r = new Hono<AppEnv>();
-
-  r.get('/employees', async (c) => {
-    const { results } = await c.env.DB.prepare(
-      `SELECT ${SELECT_COLS} FROM employees WHERE tenant_id = ? ORDER BY created_at, id`,
-    )
-      .bind(c.get('tenant'))
-      .all();
-    return c.json({ employees: (results ?? []).map(mapRow) });
-  });
-
-  r.post('/employees', async (c) => {
-    const parsed = parseBody(employeeCreateSchema, await readJson(c));
-    if (!parsed.ok) return c.json({ error: 'Некоректні дані', issues: parsed.issues }, 400);
-    const v = parsed.value;
-    const id = v.id ?? crypto.randomUUID();
-
-    const existing = await c.env.DB.prepare('SELECT tenant_id FROM employees WHERE id = ?')
-      .bind(id)
-      .first<{ tenant_id: string }>();
-    if (existing) return c.json({ error: 'Працівника з таким id вже існує' }, 409);
-
-    const row = await c.env.DB.prepare(
-      `INSERT INTO employees (id, tenant_id, name, monthly_salary_uah)
-       VALUES (?1, ?2, ?3, ?4)
-       RETURNING ${SELECT_COLS}`,
-    )
-      .bind(id, c.get('tenant'), v.name, v.monthlySalaryUah)
-      .first<Record<string, unknown>>();
-    return c.json({ employee: row && mapRow(row) }, 201);
-  });
-
-  r.patch('/employees/:id', async (c) => {
-    const parsed = parseBody(employeePatchSchema, await readJson(c));
-    if (!parsed.ok) return c.json({ error: 'Некоректні дані', issues: parsed.issues }, 400);
-    const v = parsed.value;
-
-    const sets: string[] = [];
-    const params: Array<string | number> = [];
-    if (v.name !== undefined) {
-      sets.push('name = ?');
-      params.push(v.name);
-    }
-    if (v.monthlySalaryUah !== undefined) {
-      sets.push('monthly_salary_uah = ?');
-      params.push(v.monthlySalaryUah);
-    }
-    params.push(c.get('tenant'), c.req.param('id'));
-
-    const row = await c.env.DB.prepare(
-      `UPDATE employees SET ${sets.join(', ')}
-       WHERE tenant_id = ? AND id = ?
-       RETURNING ${SELECT_COLS}`,
-    )
-      .bind(...params)
-      .first<Record<string, unknown>>();
-    if (!row) return c.json({ error: 'Працівника не знайдено' }, 404);
-    return c.json({ employee: mapRow(row) });
-  });
-
-  r.delete('/employees/:id', async (c) => {
-    const row = await c.env.DB.prepare(
-      'DELETE FROM employees WHERE tenant_id = ? AND id = ? RETURNING id',
-    )
-      .bind(c.get('tenant'), c.req.param('id'))
-      .first();
-    if (!row) return c.json({ error: 'Працівника не знайдено' }, 404);
-    return c.json({ ok: true });
-  });
+  r.route('/', employeeRoutes());
 
   r.get('/enterprise', async (c) => {
     const row = await c.env.DB.prepare(

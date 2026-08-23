@@ -1,4 +1,5 @@
 import { quotaSlots, remainingBookingSlots, type EnterpriseBookingContext } from '../../hr/index';
+import { formatNumberUa } from '../../../lib/format';
 import type { FinanceSnapshot } from '../../finance/index';
 
 export type ActionSeverity = 'danger' | 'warning' | 'info' | 'ok';
@@ -46,7 +47,7 @@ function contractorActions(finance: DailyActionsInput['finance']): DailyAction[]
       module: 'finance',
       title:
         c.level === 'danger'
-          ? `${c.name} — ${c.usedUah.toLocaleString('uk-UA')} ₴ з ${c.limitUah.toLocaleString('uk-UA')} ₴: ризик блокування ПН`
+          ? `${c.name} — ${formatNumberUa(c.usedUah)} ₴ з ${formatNumberUa(c.limitUah)} ₴: ризик блокування ПН`
           : `${c.name} — ліміт використано понад 70%`,
       detail:
         c.level === 'danger'

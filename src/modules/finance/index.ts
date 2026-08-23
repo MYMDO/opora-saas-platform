@@ -70,7 +70,7 @@ export function getFinanceSnapshot(
 }
 
 export { VAT_RULES, limitLevel, usagePercent } from './domain/taxRules';
-export { assessTaxRisk, contractorsAtRisk } from './domain/riskScore';
+export { assessTaxRisk } from './domain/riskScore';
 export {
   addContractor,
   defaultFinanceScenario,
