@@ -40,7 +40,13 @@ export function hrRoutes() {
     const parsed = parseBody(employeeCreateSchema, await readJson(c));
     if (!parsed.ok) return c.json({ error: 'Некоректні дані', issues: parsed.issues }, 400);
     const v = parsed.value;
-    const id = crypto.randomUUID();
+    const id = v.id ?? crypto.randomUUID();
+
+    const existing = await c.env.DB.prepare('SELECT tenant_id FROM employees WHERE id = ?')
+      .bind(id)
+      .first<{ tenant_id: string }>();
+    if (existing) return c.json({ error: 'Працівника з таким id вже існує' }, 409);
+
     const row = await c.env.DB.prepare(
       `INSERT INTO employees (id, tenant_id, name, monthly_salary_uah)
        VALUES (?1, ?2, ?3, ?4)

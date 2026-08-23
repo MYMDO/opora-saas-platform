@@ -36,7 +36,13 @@ export function financeRoutes() {
     const parsed = parseBody(contractorCreateSchema, await readJson(c));
     if (!parsed.ok) return c.json({ error: 'Некоректні дані', issues: parsed.issues }, 400);
     const v = parsed.value;
-    const id = crypto.randomUUID();
+    const id = v.id ?? crypto.randomUUID();
+
+    const existing = await c.env.DB.prepare('SELECT tenant_id FROM contractors WHERE id = ?')
+      .bind(id)
+      .first<{ tenant_id: string }>();
+    if (existing) return c.json({ error: 'Контрагента з таким id вже існує' }, 409);
+
     const row = await c.env.DB.prepare(
       `INSERT INTO contractors (id, tenant_id, name, used_uah, limit_uah)
        VALUES (?1, ?2, ?3, ?4, ?5)

@@ -50,6 +50,7 @@ describe('opora-api', () => {
 
   it('creates a contractor with defaults and returns 201', async () => {
     const db = new FakeD1([
+      { test: (s) => s.includes("FROM contractors WHERE id = ?"), handle: () => null },
       {
         test: (s) => s.includes('INSERT INTO contractors'),
         handle: (p) => ({ id: p[0], name: p[2], used_uah: p[3], limit_uah: p[4] }),
@@ -63,6 +64,35 @@ describe('opora-api', () => {
     expect(await res.json()).toEqual({
       contractor: { id: expect.any(String), name: 'ТОВ «Новий»', usedUah: 0, limitUah: 100_000 },
     });
+  });
+
+  it('accepts a client-generated uuid and conflicts on duplicate', async () => {
+    const fixedId = '11111111-2222-4333-8444-555555555555';
+    let exists = false;
+    const db = new FakeD1([
+      {
+        test: (s) => s.includes('FROM contractors WHERE id = ?'),
+        handle: () => (exists ? { tenant_id: 'demo' } : null),
+      },
+      {
+        test: (s) => s.includes('INSERT INTO contractors'),
+        handle: (p) => {
+          exists = true;
+          return { id: p[0], name: p[2], used_uah: p[3], limit_uah: p[4] };
+        },
+      },
+    ]);
+    const c = client(db);
+    const first = await c.request(
+      '/v1/finance/contractors',
+      jsonInit('POST', { id: fixedId, name: 'Seed', limitUah: 100_000 }),
+    );
+    expect(first.status).toBe(201);
+    const second = await c.request(
+      '/v1/finance/contractors',
+      jsonInit('POST', { id: fixedId, name: 'Дубль', limitUah: 100_000 }),
+    );
+    expect(second.status).toBe(409);
   });
 
   it('rejects invalid contractor payloads with 400 and issues', async () => {

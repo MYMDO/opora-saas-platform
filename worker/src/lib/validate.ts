@@ -4,7 +4,12 @@ const MAX_UAH = 1_000_000_000;
 
 const uahInt = z.coerce.number().int().min(0).max(MAX_UAH);
 
+const clientUuid = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Має бути UUID');
+
 export const contractorCreateSchema = z.object({
+  id: clientUuid.optional(),
   name: z.string().trim().min(1).max(120),
   usedUah: z.coerce.number().int().min(0).max(MAX_UAH).optional(),
   limitUah: z.coerce.number().int().min(1).max(MAX_UAH),
@@ -19,6 +24,7 @@ export const contractorPatchSchema = z
   .refine((v) => Object.keys(v).length > 0, { message: 'Порожній патч' });
 
 export const employeeCreateSchema = z.object({
+  id: clientUuid.optional(),
   name: z.string().trim().min(1).max(120),
   monthlySalaryUah: uahInt,
 });

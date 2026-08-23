@@ -157,7 +157,7 @@ export function FinancePage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {fin.contractors.map((c, i) => (
-              <div key={`${c.name}-${i}`}>
+              <div key={c.id}>
                 <div
                   style={{
                     display: 'flex',

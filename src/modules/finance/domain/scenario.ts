@@ -5,6 +5,7 @@ import {
 } from '../data/fixtures';
 
 export interface ContractorRow {
+  id: string;
   name: string;
   usedUah: number;
   limitUah: number;
@@ -17,7 +18,12 @@ export interface FinanceScenario {
 
 export function defaultFinanceScenario(): FinanceScenario {
   return {
-    contractors: CONTRACTORS.map((c) => ({ name: c.name, usedUah: c.usedUah, limitUah: c.limitUah })),
+    contractors: CONTRACTORS.map((c) => ({
+      id: crypto.randomUUID(),
+      name: c.name,
+      usedUah: c.usedUah,
+      limitUah: c.limitUah,
+    })),
     adjustmentWindowDays: ADJUSTMENT_WINDOW_DAYS_TO_CLOSE,
   };
 }
@@ -33,7 +39,7 @@ export const UNLISTED_CONTRACTORS_BASE_UAH = Math.max(
 export function updateContractor(
   rows: ReadonlyArray<ContractorRow>,
   index: number,
-  patch: Partial<ContractorRow>,
+  patch: Partial<Omit<ContractorRow, 'id'>>,
 ): ContractorRow[] {
   return rows.map((row, i) => (i === index ? { ...row, ...patch } : row));
 }
@@ -45,7 +51,7 @@ export function addContractor(
 ): ContractorRow[] {
   const clean = name.trim();
   if (!clean) return [...rows];
-  return [...rows, { name: clean, usedUah: 0, limitUah }];
+  return [...rows, { id: crypto.randomUUID(), name: clean, usedUah: 0, limitUah }];
 }
 
 export function removeContractor(

@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  addContractor,
+  addContractor as addContractorOp,
   removeContractor as removeContractorOp,
   updateContractor as updateContractorOp,
   VAT_RULES,
@@ -25,6 +25,8 @@ import {
   DEMO_BESS_INVESTMENT_UAH,
   type ArbitrageParams,
 } from '../modules/energy/index';
+import { api } from './api';
+import { executeSeed, reconcile } from './scenario-sync';
 
 export interface EnergyScenarioState {
   overrides: Partial<ArbitrageParams>;
@@ -37,7 +39,7 @@ export interface AppScenario {
   readonly energy: EnergyScenarioState;
 }
 
-function defaults(): AppScenario {
+export function defaults(): AppScenario {
   return {
     finance: defaultFinanceScenario(),
     hr: defaultHrScenario(),
@@ -49,30 +51,6 @@ const STORAGE_KEY = 'opora-scenario-v1';
 
 function toFiniteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-function clampNum(v: unknown, min: number, max?: number): number | undefined {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
-  const x = Math.max(min, v);
-  return max == null ? x : Math.min(x, max);
-}
-
-function sanitizeArbitrageOverrides(raw: unknown): Partial<ArbitrageParams> {
-  if (raw == null || typeof raw !== 'object') return {};
-  const s = raw as Record<string, unknown>;
-  const out: Partial<ArbitrageParams> = {};
-  const put = <K extends keyof ArbitrageParams>(key: K, min: number, max?: number, floorInt = false) => {
-    const v = clampNum(s[key as string], min, max);
-    if (v !== undefined) (out[key] as number) = floorInt ? Math.floor(v) : v;
-  };
-  put('batteryCapacityKwh', 0, 1_000_000);
-  put('maxDodPercent', 0, 100);
-  put('roundTripEfficiencyPercent', 20, 100);
-  put('cyclesPerDay', 0, 6, true);
-  put('chargePriceUahPerKwh', 0, 10_000);
-  put('dischargePriceUahPerKwh', 0, 10_000);
-  put('degradationCostUahPerKwh', 0, 10_000);
-  return out;
 }
 
 function loadInitial(): AppScenario {
@@ -97,7 +75,12 @@ function loadInitial(): AppScenario {
                 Number.isFinite(r.usedUah) &&
                 Number.isFinite(r.limitUah),
             )
-            .map((r) => ({ name: String(r.name), usedUah: Number(r.usedUah), limitUah: Number(r.limitUah) }))
+            .map((r) => ({
+              id: typeof r.id === 'string' && r.id ? r.id : crypto.randomUUID(),
+              name: String(r.name),
+              usedUah: Number(r.usedUah),
+              limitUah: Number(r.limitUah),
+            }))
         : d.finance.contractors,
     };
 
@@ -140,9 +123,35 @@ function loadInitial(): AppScenario {
     return d;
   }
 }
+
+function clampNum(v: unknown, min: number, max?: number): number | undefined {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
+  const x = Math.max(min, v);
+  return max == null ? x : Math.min(x, max);
+}
+
+function sanitizeArbitrageOverrides(raw: unknown): Partial<ArbitrageParams> {
+  if (raw == null || typeof raw !== 'object') return {};
+  const s = raw as Record<string, unknown>;
+  const out: Partial<ArbitrageParams> = {};
+  const put = <K extends keyof ArbitrageParams>(key: K, min: number, max?: number, floorInt = false) => {
+    const v = clampNum(s[key as string], min, max);
+    if (v !== undefined) (out[key] as number) = floorInt ? Math.floor(v) : v;
+  };
+  put('batteryCapacityKwh', 0, 1_000_000);
+  put('maxDodPercent', 0, 100);
+  put('roundTripEfficiencyPercent', 20, 100);
+  put('cyclesPerDay', 0, 6, true);
+  put('chargePriceUahPerKwh', 0, 10_000);
+  put('dischargePriceUahPerKwh', 0, 10_000);
+  put('degradationCostUahPerKwh', 0, 10_000);
+  return out;
+}
+
 interface ScenarioContextValue {
   readonly scenario: AppScenario;
-  updateContractor(index: number, patch: Partial<ContractorRow>): void;
+  readonly apiOnline: boolean | null;
+  updateContractor(index: number, patch: Partial<Omit<ContractorRow, 'id'>>): void;
   addContractor(name: string): void;
   removeContractor(index: number): void;
   addEmployee(name: string, monthlySalaryUah: number): void;
@@ -155,79 +164,131 @@ interface ScenarioContextValue {
 
 const ScenarioContext = createContext<ScenarioContextValue | null>(null);
 
-let employeeSeq = 0;
-
 export function ScenarioProvider({ children }: { children: ReactNode }) {
   const [scenario, setScenario] = useState<AppScenario>(loadInitial);
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(scenario));
     } catch {
-      // приватний режим або переповнений сховищ-квота — сценарій лишається лише в памʼяті
+      // приватний режим або переповнена квота — сценарій лишається лише в памʼяті
     }
   }, [scenario]);
 
-  const value = useMemo<ScenarioContextValue>(
-    () => ({
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [contractors, employees, enterprise] = await Promise.all([
+          api.listContractors(),
+          api.listEmployees(),
+          api.getEnterprise(),
+        ]);
+        if (cancelled) return;
+        const { scenario: next, seed } = reconcile(loadInitial(), {
+          contractors,
+          employees,
+          enterprise,
+        });
+        setScenario(next);
+        if (seed.contractors.length > 0 || seed.employees.length > 0 || seed.enterprise) {
+          await executeSeed(seed);
+        }
+        if (!cancelled) setApiOnline(true);
+      } catch (err) {
+        console.warn('[ОПОРА] API недоступний — працюємо на локальному сценарії', err);
+        if (!cancelled) setApiOnline(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const value = useMemo<ScenarioContextValue>(() => {
+    const sync = (p: Promise<unknown>) => p.catch((e) => console.warn('[ОПОРА] sync:', e));
+
+    return {
       scenario,
-      updateContractor: (index, patch) =>
+      apiOnline,
+      updateContractor: (index, patch) => {
+        const row = scenario.finance.contractors[index];
         setScenario((prev) => ({
           ...prev,
           finance: {
             ...prev.finance,
             contractors: updateContractorOp(prev.finance.contractors, index, patch),
           },
-        })),
-      addContractor: (name) =>
+        }));
+        if (row) sync(api.patchContractor(row.id, patch));
+      },
+      addContractor: (name) => {
+        const row: ContractorRow = {
+          id: crypto.randomUUID(),
+          name: name.trim(),
+          usedUah: 0,
+          limitUah: VAT_RULES.perContractorLimitUah,
+        };
         setScenario((prev) => ({
           ...prev,
           finance: {
             ...prev.finance,
-            contractors: addContractor(prev.finance.contractors, name, VAT_RULES.perContractorLimitUah),
+            contractors: addContractorOp(prev.finance.contractors, name, row.limitUah),
           },
-        })),
-      removeContractor: (index) =>
+        }));
+        sync(api.createContractor(row));
+      },
+      removeContractor: (index) => {
+        const row = scenario.finance.contractors[index];
         setScenario((prev) => ({
           ...prev,
           finance: {
             ...prev.finance,
             contractors: removeContractorOp(prev.finance.contractors, index),
           },
-        })),
-      addEmployee: (name, monthlySalaryUah) =>
-        setScenario((prev) => {
-          const clean = name.trim();
-          if (!clean) return prev;
-          employeeSeq += 1;
-          const row: EmployeeRow = {
-            id: `emp-${Date.now()}-${employeeSeq}`,
-            name: clean,
-            monthlySalaryUah: Math.max(0, monthlySalaryUah),
-          };
-          return { ...prev, hr: { ...prev.hr, employees: [...prev.hr.employees, row] } };
-        }),
-      updateEmployee: (id, patch) =>
+        }));
+        if (row) sync(api.deleteContractor(row.id));
+      },
+      addEmployee: (name, monthlySalaryUah) => {
+        const clean = name.trim();
+        if (!clean) return;
+        const row: EmployeeRow = {
+          id: crypto.randomUUID(),
+          name: clean,
+          monthlySalaryUah: Math.max(0, monthlySalaryUah),
+        };
+        setScenario((prev) => ({
+          ...prev,
+          hr: { ...prev.hr, employees: [...prev.hr.employees, row] },
+        }));
+        sync(api.createEmployee(row));
+      },
+      updateEmployee: (id, patch) => {
         setScenario((prev) => ({
           ...prev,
           hr: {
             ...prev.hr,
             employees: prev.hr.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
           },
-        })),
-      removeEmployee: (id) =>
+        }));
+        sync(api.patchEmployee(id, patch));
+      },
+      removeEmployee: (id) => {
         setScenario((prev) => ({
           ...prev,
-          hr: {
-            ...prev.hr,
-            employees: prev.hr.employees.filter((e) => e.id !== id),
-          },
-        })),
-      updateEnterprise: (patch) =>
+          hr: { ...prev.hr, employees: prev.hr.employees.filter((e) => e.id !== id) },
+        }));
+        sync(api.deleteEmployee(id));
+      },
+      updateEnterprise: (patch) => {
+        const next = { ...scenario.hr.enterprise, ...patch };
         setScenario((prev) => ({
           ...prev,
           hr: { ...prev.hr, enterprise: { ...prev.hr.enterprise, ...patch } },
-        })),
+        }));
+        sync(api.putEnterprise(next));
+      },
       updateEnergy: (patch) =>
         setScenario((prev) => ({
           ...prev,
@@ -239,10 +300,23 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
             investmentUah: patch.investmentUah ?? prev.energy.investmentUah,
           },
         })),
-      resetScenario: () => setScenario(defaults()),
-    }),
-    [scenario],
-  );
+      resetScenario: () => {
+        setScenario(defaults());
+        void (async () => {
+          try {
+            const [cs, es] = await Promise.all([api.listContractors(), api.listEmployees()]);
+            await Promise.all([
+              ...cs.map((c) => api.deleteContractor(c.id)),
+              ...es.map((e) => api.deleteEmployee(e.id)),
+            ]);
+            await api.putEnterprise(defaults().hr.enterprise);
+          } catch (e) {
+            console.warn('[ОПОРА] reset cloud sync:', e);
+          }
+        })();
+      },
+    };
+  }, [scenario, apiOnline]);
 
   return <ScenarioContext.Provider value={value}>{children}</ScenarioContext.Provider>;
 }
