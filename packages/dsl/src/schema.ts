@@ -183,3 +183,7 @@ export const AppDefinitionSchema = z.object({
 });
 
 export type AppDefinition = z.infer<typeof AppDefinitionSchema>;
+
+export type AppDefinitionInput = z.input<typeof AppDefinitionSchema>;
+export type EntityDefinitionInput = z.input<typeof EntityDefinitionSchema>;
+export type FieldDefinitionInput = z.input<typeof FieldDefinitionSchema>;
