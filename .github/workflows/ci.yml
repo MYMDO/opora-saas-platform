@@ -19,3 +19,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: API package (worker/)
+        working-directory: worker
+        run: |
+          npm ci
+          npm run typecheck
+          npm test

@@ -4,6 +4,9 @@ coverage/
 *.local
 *.tsbuildinfo
 
+.wrangler/
+.dev.vars
+
 .env
 .env.*
 !.env.example

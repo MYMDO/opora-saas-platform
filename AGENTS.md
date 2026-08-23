@@ -3,8 +3,9 @@
 ## Repo state
 
 - Product: **ОПОРА** — modular B2B SaaS platform for operational resilience of Ukrainian businesses. Three modules: ШІ-агенти (AI agents), Енергоменеджмент (EMS / BESS / solar tariff arbitrage), Фінанси та податки (VAT invoice limits, risk score, compliance deadlines).
-- Stack: **Vite 6 + React 19 + TypeScript (strict)**, recharts, lucide-react, vitest, ESLint 9 (flat config) + react-hooks rules. SPA by design for Phase 1; migration to Next.js App Router is planned only when the API layer lands (Phase 2).
-- Commands: `npm install` · `npm run dev` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run build`. CI runs them in that order (`.github/workflows/ci.yml`); run lint + typecheck + test after every change.
+- Stack: **Vite 6 + React 19 + TypeScript (strict)**, recharts, lucide-react, vitest, ESLint 9 (flat config) + react-hooks rules. Backend (Phase 2): **Hono on Cloudflare Workers + D1** in `worker/` (own package.json/tsconfig; Free-Tier guardrails — no DO/Queues/KV-writes; tenant via `X-Opora-Tenant`, app-level tenancy since D1 has no RLS). SPA by design for Phase 1; Next.js migration is off the table while Pages serves the SPA.
+- Commands: `npm install` · `npm run dev` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run build`. CI runs them in that order plus `worker/` typecheck+tests (`.github/workflows/ci.yml`); run lint + typecheck + test after every change.
+- Worker commands: from `worker/` — `npm run dev` (local workerd+D1), `npm run db:migrate:local|--remote`, `npm run deploy` → https://opora-api.p4d-b2q.workers.dev
 
 ## Files
 
@@ -19,6 +20,7 @@
 - `src/modules/billing/domain/` — hybrid pricing engine (platform fee + per-resolution outcome with included allowance + EMS fixed/share/capacity modes) per plan §2.4; `PLANS` is the single source for tariff-plan figures shown in UI. Same rule applies: logic + tests change together.
 - `src/modules/*/data/fixtures.ts` — hardcoded demo data (there is no backend yet). AI-agent chat replies come from a canned bank cycled by modulo.
 - `opora-saas-platform.jsx` — legacy single-file prototype kept as visual reference only; do not extend it. Port anything needed into `src/`.
+- `worker/` — Cloudflare Workers API (Phase 2 skeleton): Hono routes mirror the frontend scenario ops (`finance/contractors`, `hr/employees`, `hr/enterprise`) over D1; tests stub D1 via `test/fakeD1.ts`. Money columns are INTEGER ₴; every query filters by `tenant_id` from `resolveTenant()`.
 - Filenames contain Cyrillic characters and spaces — always quote paths in shell commands.
 
 ## Strategy & architecture

@@ -1,0 +1,11 @@
+name = "opora-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:5173"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "opora-db"
+database_id = "14a09de3-4fba-4ac9-81ae-c63a64b86624"
