@@ -10,12 +10,13 @@ import {
   Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Dot } from '../design-system/components';
+import { Dot, ErrorBoundary } from '../design-system/components';
 import { formatNumberUa, formatTimeUa } from '../lib/format';
 import { TODAY_AI_RESOLVED } from '../modules/ai-agents/index';
 import { getEnergySnapshot } from '../modules/energy/index';
 import { getFinanceSnapshot } from '../modules/finance/index';
 import { useScenario } from './scenario';
+import { parseTabFromHash, tabToHash, type TabId } from './routing';
 
 const OverviewPage = lazy(() =>
   import('../modules/overview/ui/OverviewPage').then((m) => ({ default: m.OverviewPage })),
@@ -30,13 +31,11 @@ const FinancePage = lazy(() =>
   import('../modules/finance/ui/FinancePage').then((m) => ({ default: m.FinancePage })),
 );
 
-type TabId = 'overview' | 'ai' | 'energy' | 'finance';
-
-interface NavItem {
+type NavItem = {
   id: TabId;
   label: string;
   Icon: LucideIcon;
-}
+};
 
 const NAV: ReadonlyArray<NavItem> = [
   { id: 'overview', label: 'Огляд', Icon: LayoutDashboard },
@@ -69,8 +68,19 @@ function StatusMetric({ Icon, color, text }: { Icon: LucideIcon; color: string; 
 }
 
 export default function App() {
-  const [tab, setTab] = useState<TabId>('overview');
+  const [tab, setTabState] = useState<TabId>(() => parseTabFromHash(window.location.hash));
   const [now, setNow] = useState(() => new Date());
+
+  const setTab = (next: TabId) => {
+    setTabState(next);
+    history.replaceState(null, '', tabToHash(next));
+  };
+
+  useEffect(() => {
+    const onHashChange = () => setTabState(parseTabFromHash(window.location.hash));
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);
@@ -194,18 +204,20 @@ export default function App() {
         </div>
 
         <div style={{ padding: '0 22px 24px 22px', overflowY: 'auto' }}>
-          <Suspense
-            fallback={
-              <div className="f-mono" style={{ fontSize: 12, color: 'var(--text-mute)', padding: 24 }}>
-                Завантаження…
-              </div>
-            }
-          >
-            {tab === 'overview' && <OverviewPage />}
-            {tab === 'ai' && <AiAgentsPage />}
-            {tab === 'energy' && <EnergyPage />}
-            {tab === 'finance' && <FinancePage />}
-          </Suspense>
+          <ErrorBoundary key={tab} label={NAV.find((n) => n.id === tab)?.label}>
+            <Suspense
+              fallback={
+                <div className="f-mono" style={{ fontSize: 12, color: 'var(--text-mute)', padding: 24 }}>
+                  Завантаження…
+                </div>
+              }
+            >
+              {tab === 'overview' && <OverviewPage />}
+              {tab === 'ai' && <AiAgentsPage />}
+              {tab === 'energy' && <EnergyPage />}
+              {tab === 'finance' && <FinancePage />}
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </div>
 

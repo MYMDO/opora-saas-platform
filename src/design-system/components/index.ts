@@ -4,3 +4,4 @@ export { Eyebrow } from './Eyebrow';
 export { KpiCard } from './KpiCard';
 export { AlertRow, type AlertLevel } from './AlertRow';
 export { ChartTooltip } from './ChartTooltip';
+export { ErrorBoundary } from './ErrorBoundary';
