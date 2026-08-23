@@ -94,4 +94,30 @@ describe('buildDailyActions', () => {
     });
     expect(calm).toEqual([]);
   });
+
+  it('signals a bookable roster only when slots remain', () => {
+    const ready = buildDailyActions({
+      ...base,
+      roster: { eligibleCount: 2, total: 5 },
+    });
+    const readyItem = ready.find((a) => a.id === 'booking-roster-ready');
+    expect(readyItem?.severity).toBe('info');
+
+    const exhausted = buildDailyActions({
+      ...base,
+      booking: { ...DEMO_ENTERPRISE, alreadyBookedCount: 10 },
+      roster: { eligibleCount: 2, total: 5 },
+    });
+    expect(exhausted.map((a) => a.id)).not.toContain('booking-roster-ready');
+  });
+
+  it('warns when nobody passes the threshold despite free slots', () => {
+    const none = buildDailyActions({
+      ...base,
+      roster: { eligibleCount: 0, total: 5 },
+    });
+    const item = none.find((a) => a.id === 'booking-roster-below-threshold');
+    expect(item?.severity).toBe('warning');
+    expect(item?.module).toBe('hr');
+  });
 });

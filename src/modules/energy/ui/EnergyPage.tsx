@@ -1,5 +1,5 @@
-import { useMemo, useState, type CSSProperties } from 'react';
-import { BatteryCharging, Clock, Sun, TrendingDown } from 'lucide-react';
+import { type CSSProperties } from 'react';
+import { BatteryCharging, Clock, RotateCcw, Sun, TrendingDown } from 'lucide-react';
 import {
   Area,
   Bar,
@@ -17,7 +17,6 @@ import {
   computeBreakEvenDischargeUahPerKwh,
   DEFAULT_ARBITRAGE,
   DEMO_BESS,
-  DEMO_BESS_INVESTMENT_UAH,
   ENERGY_24H,
   getEnergySnapshot,
   MARKET_TARIFFS,
@@ -26,6 +25,21 @@ import {
   type ArbitrageParams,
 } from '../index';
 import { formatDecimalUa, formatNumberUa } from '../../../lib/format';
+import { useScenario } from '../../../app/scenario';
+
+const resetButtonStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
+  borderRadius: 6,
+  padding: '4px 8px',
+  cursor: 'pointer',
+  color: 'var(--text-mute)',
+  fontSize: 11,
+  flexShrink: 0,
+};
 
 const inputStyle: CSSProperties = {
   padding: '8px 10px',
@@ -98,16 +112,19 @@ function ResultRow({ label, value }: { label: string; value: string }) {
 }
 
 export function EnergyPage() {
-  const [params, setParams] = useState<ArbitrageParams>(() => ({
+  const { scenario, updateEnergy, resetScenario } = useScenario();
+  const { overrides, investmentUah } = scenario.energy;
+
+  const params: ArbitrageParams = {
     ...DEFAULT_ARBITRAGE,
     batteryCapacityKwh: DEMO_BESS.capacityKwh,
-  }));
-  const [investmentUah, setInvestmentUah] = useState(DEMO_BESS_INVESTMENT_UAH);
+    ...overrides,
+  };
 
-  const patch = (p: Partial<ArbitrageParams>) => setParams((prev) => ({ ...prev, ...p }));
+  const patch = (p: Partial<ArbitrageParams>) => updateEnergy({ overrides: p });
 
-  const snap = useMemo(() => getEnergySnapshot(params, investmentUah), [params, investmentUah]);
-  const breakEven = useMemo(() => computeBreakEvenDischargeUahPerKwh(params), [params]);
+  const snap = getEnergySnapshot(params, investmentUah);
+  const breakEven = computeBreakEvenDischargeUahPerKwh(params);
   const profitable = params.dischargePriceUahPerKwh > breakEven;
 
   const arbitrageRows = [
@@ -171,7 +188,19 @@ export function EnergyPage() {
       </div>
 
       <div className="panel" style={{ padding: 18 }}>
-        <Eyebrow color="var(--ai)">Інтерактивна модель</Eyebrow>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <Eyebrow color="var(--ai)">Інтерактивна модель</Eyebrow>
+          <button onClick={resetScenario} title="Повернути демо-дані" aria-label="Скинути сценарій" style={resetButtonStyle}>
+            <RotateCcw size={11} /> Скинути
+          </button>
+        </div>
         <div className="f-display" style={{ fontSize: 15, fontWeight: 600 }}>
           Калькулятор економіки BESS
         </div>
@@ -252,7 +281,7 @@ export function EnergyPage() {
               value={investmentUah}
               min={0}
               step={100_000}
-              onChange={setInvestmentUah}
+              onChange={(v) => updateEnergy({ investmentUah: v })}
             />
           </div>
 

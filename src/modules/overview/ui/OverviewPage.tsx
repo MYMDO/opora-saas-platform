@@ -21,6 +21,7 @@ import {
   DEMO_PLAN_ID,
   DEMO_RESOLUTIONS_THIS_MONTH,
 } from '../../billing/index';
+import { assessBookingRoster } from '../../hr/index';
 import { buildDailyActions, MODULE_LABELS, type DailyAction } from '../domain/actions';
 import { useScenario } from '../../../app/scenario';
 
@@ -111,11 +112,13 @@ export function OverviewPage() {
   const finance = getFinanceSnapshot(scenario.finance);
   const energy = getEnergySnapshot();
 
+  const roster = assessBookingRoster(scenario.hr.employees, scenario.hr.enterprise);
   const actions = buildDailyActions({
     finance,
     batterySocPercent: energy.socPercent,
     booking: scenario.hr.enterprise,
     aiResolvedToday: TODAY_AI_RESOLVED,
+    roster: { eligibleCount: roster.eligibleCount, total: roster.rows.length },
   });
   const topActions = actions.slice(0, 3);
   const restActions = actions.slice(3);

@@ -25,6 +25,8 @@ export interface DailyActionsInput {
   readonly batterySocPercent: number;
   readonly booking: EnterpriseBookingContext;
   readonly aiResolvedToday: number;
+  /** Живі підсумки реєстру працівників; відсутні — HR-правила мовчать */
+  readonly roster?: { readonly eligibleCount: number; readonly total: number };
 }
 
 const SEVERITY_RANK: Record<ActionSeverity, number> = {
@@ -98,6 +100,32 @@ function bookingActions(booking: EnterpriseBookingContext): DailyAction[] {
   return [];
 }
 
+function rosterActions(input: DailyActionsInput): DailyAction[] {
+  const roster = input.roster;
+  if (!roster || roster.total <= 0) return [];
+  if (remainingBookingSlots(input.booking) <= 0) return [];
+  if (roster.eligibleCount > 0) {
+    return [
+      {
+        id: 'booking-roster-ready',
+        severity: 'info',
+        module: 'hr',
+        title: `Можна забронювати ${roster.eligibleCount} з ${roster.total} працівників`,
+        detail: 'Зарплати відповідають порогу КМУ №692, у квоті є вільні місця.',
+      },
+    ];
+  }
+  return [
+    {
+      id: 'booking-roster-below-threshold',
+      severity: 'warning',
+      module: 'hr',
+      title: 'Жоден працівник не проходить поріг бронювання',
+      detail: `Підніміть зарплати до порогу або перевірте статус підприємства (${roster.total} у реєстрі).`,
+    },
+  ];
+}
+
 export function buildDailyActions(input: DailyActionsInput): DailyAction[] {
   const items: DailyAction[] = [
     ...contractorActions(input.finance),
@@ -125,6 +153,7 @@ export function buildDailyActions(input: DailyActionsInput): DailyAction[] {
   }
 
   items.push(...bookingActions(input.booking));
+  items.push(...rosterActions(input));
 
   if (input.aiResolvedToday > 0) {
     items.push({

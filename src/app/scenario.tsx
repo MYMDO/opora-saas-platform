@@ -21,20 +21,58 @@ import {
   type EnterpriseBookingContext,
   type HrScenario,
 } from '../modules/hr/index';
+import {
+  DEMO_BESS_INVESTMENT_UAH,
+  type ArbitrageParams,
+} from '../modules/energy/index';
+
+export interface EnergyScenarioState {
+  overrides: Partial<ArbitrageParams>;
+  investmentUah: number;
+}
 
 export interface AppScenario {
   readonly finance: FinanceScenario;
   readonly hr: HrScenario;
+  readonly energy: EnergyScenarioState;
 }
 
 function defaults(): AppScenario {
-  return { finance: defaultFinanceScenario(), hr: defaultHrScenario() };
+  return {
+    finance: defaultFinanceScenario(),
+    hr: defaultHrScenario(),
+    energy: { overrides: {}, investmentUah: DEMO_BESS_INVESTMENT_UAH },
+  };
 }
 
 const STORAGE_KEY = 'opora-scenario-v1';
 
 function toFiniteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function clampNum(v: unknown, min: number, max?: number): number | undefined {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
+  const x = Math.max(min, v);
+  return max == null ? x : Math.min(x, max);
+}
+
+function sanitizeArbitrageOverrides(raw: unknown): Partial<ArbitrageParams> {
+  if (raw == null || typeof raw !== 'object') return {};
+  const s = raw as Record<string, unknown>;
+  const out: Partial<ArbitrageParams> = {};
+  const put = <K extends keyof ArbitrageParams>(key: K, min: number, max?: number, floorInt = false) => {
+    const v = clampNum(s[key as string], min, max);
+    if (v !== undefined) (out[key] as number) = floorInt ? Math.floor(v) : v;
+  };
+  put('batteryCapacityKwh', 0, 1_000_000);
+  put('maxDodPercent', 0, 100);
+  put('roundTripEfficiencyPercent', 20, 100);
+  put('cyclesPerDay', 0, 6, true);
+  put('chargePriceUahPerKwh', 0, 10_000);
+  put('dischargePriceUahPerKwh', 0, 10_000);
+  put('degradationCostUahPerKwh', 0, 10_000);
+  return out;
 }
 
 function loadInitial(): AppScenario {
@@ -89,12 +127,19 @@ function loadInitial(): AppScenario {
           }))
       : d.hr.employees;
 
-    return { finance, hr: { employees, enterprise } };
+    const energy: EnergyScenarioState = {
+      overrides: sanitizeArbitrageOverrides(parsed?.energy?.overrides),
+      investmentUah: Math.max(
+        0,
+        toFiniteNumber(parsed?.energy?.investmentUah, d.energy.investmentUah),
+      ),
+    };
+
+    return { finance, hr: { employees, enterprise }, energy };
   } catch {
     return d;
   }
 }
-
 interface ScenarioContextValue {
   readonly scenario: AppScenario;
   updateContractor(index: number, patch: Partial<ContractorRow>): void;
@@ -104,6 +149,7 @@ interface ScenarioContextValue {
   updateEmployee(id: string, patch: Partial<Omit<EmployeeRow, 'id'>>): void;
   removeEmployee(id: string): void;
   updateEnterprise(patch: Partial<EnterpriseBookingContext>): void;
+  updateEnergy(patch: { overrides?: Partial<ArbitrageParams>; investmentUah?: number }): void;
   resetScenario(): void;
 }
 
@@ -181,6 +227,17 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
         setScenario((prev) => ({
           ...prev,
           hr: { ...prev.hr, enterprise: { ...prev.hr.enterprise, ...patch } },
+        })),
+      updateEnergy: (patch) =>
+        setScenario((prev) => ({
+          ...prev,
+          energy: {
+            overrides:
+              patch.overrides === undefined
+                ? prev.energy.overrides
+                : { ...prev.energy.overrides, ...patch.overrides },
+            investmentUah: patch.investmentUah ?? prev.energy.investmentUah,
+          },
         })),
       resetScenario: () => setScenario(defaults()),
     }),
