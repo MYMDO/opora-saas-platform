@@ -1,0 +1,11 @@
+name = "opora-core-api"
+main = "src/worker.ts"
+compatibility_date = "2026-08-01"
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:5173,https://opora-saas-platform.pages.dev"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "opora-core-db"
+database_id = "3fd4575f-f3aa-4abe-9c1e-7f827de4bcce"

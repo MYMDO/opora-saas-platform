@@ -22,8 +22,17 @@
 - `packages/dsl` — Zod-схеми DSL + `parseAppDefinition`. **Єдиний експорт:**
   `parseAppDefinition`, типи `AppDefinition*`, клас `AppDefinitionError`.
   Вирази (`allow`, `if`) тут НЕ виконуються і не парсяться.
-- Наступні пакети (у черзі): `metadata`, `data-runtime`, `policy`, `ui-renderer`,
-  `workflow`, `apps/api`, `apps/builder-web`, `apps/runtime-web`.
+- `packages/data-runtime` — DataPort-контракт (ADR 0001.2): Memory-адаптер (тести/
+  офлайн) + D1-адаптер; валідація записів за EntityDefinition; audit+outbox у кожній
+  мутації. SQL-білдери тестуються окремо від БД.
+- `packages/metadata` — реєстр застосунків і релізів (draft/publish/getActive),
+  DSL-валідація через @opora/dsl з MetadataError('invalid_definition', issues).
+- `apps/api` — Hono runtime API: `/v1/apps` → releases/publish →
+  `/v1/apps/:slug/data/:entity` CRUD лише за PUBLISHED релізом.
+  Deploy: `cd apps/api && npx wrangler deploy` → https://opora-core-api.p4d-b2q.workers.dev
+  (D1 opora-core-db; міграції `npm run db:migrate:remote|--local`).
+- У черзі: `policy` (AST-evaluator), `ui-schema`, `ui-renderer`, `workflow`,
+  `connector-sdk`, `apps/builder-web`, `apps/runtime-web`.
 
 ## Команди
 

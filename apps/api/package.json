@@ -4,8 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "dev": "wrangler dev --port 8790",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create opora-core-db",
+    "db:migrate:local": "wrangler d1 migrations apply opora-core-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply opora-core-db --remote",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@opora/dsl": "workspace:^",
@@ -15,6 +20,8 @@
   },
   "devDependencies": {
     "typescript": "^5.6.3",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "@cloudflare/workers-types": "^5.20260820.0",
+    "wrangler": "^4.125.0"
   }
 }

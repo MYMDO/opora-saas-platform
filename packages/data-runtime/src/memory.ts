@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+
 import type { EntityDefinition } from '@opora/dsl';
 import { RecordNotFoundError } from './errors';
 import type { AuditEvent, DataPort, DataPortContext, OutboxEvent } from './port';
@@ -87,7 +87,7 @@ export class MemoryDataPort implements DataPort {
     const clean = validateRecord(entity, data, 'create');
     const ts = nowIso();
     const record: RecordEntity = {
-      id: randomUUID(),
+      id: crypto.randomUUID(),
       tenantId: ctx.tenantId,
       appSlug: ctx.appSlug,
       entity: entity.apiName,
@@ -132,7 +132,7 @@ export class MemoryDataPort implements DataPort {
   ): void {
     const ts = nowIso();
     this.state.audit.push({
-      id: randomUUID(),
+      id: crypto.randomUUID(),
       tenantId: ctx.tenantId,
       actorId: ctx.actorId,
       action,
@@ -144,7 +144,7 @@ export class MemoryDataPort implements DataPort {
     });
     if (action !== 'update') {
       this.state.outbox.push({
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         tenantId: ctx.tenantId,
         eventType: `${resourceType}.${action}d`,
         payload: { recordId: record.id },

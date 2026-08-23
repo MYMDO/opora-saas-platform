@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildAudit,
+  buildInsertRecord,
+  buildListQuery,
+  buildOutbox,
+  buildSoftDelete,
+  buildUpdateRecord,
+} from '../src/d1';
+
+const sampleRecord = {
+  id: 'r-1',
+  tenantId: 't1',
+  appSlug: 'service-desk',
+  entity: 'ticket',
+  data: { title: 'T', status: 'new' },
+  ownerId: null,
+  createdAt: '2026-08-23T00:00:00.000Z',
+  updatedAt: '2026-08-23T00:00:00.000Z',
+};
+
+describe('SQL builders', () => {
+  it('insert бʼє по всіх колонках', () => {
+    const s = buildInsertRecord(sampleRecord);
+    expect(s.sql).toContain('INSERT INTO records');
+    expect(s.params).toEqual([
+      'r-1',
+      't1',
+      'service-desk',
+      'ticket',
+      '{"title":"T","status":"new"}',
+      null,
+      sampleRecord.createdAt,
+      sampleRecord.updatedAt,
+    ]);
+  });
+
+  it('update фільтрує soft-deleted і серіалізує data', () => {
+    const s = buildUpdateRecord('r-1', { title: 'T2' });
+    expect(s.sql).toContain('deleted_at IS NULL');
+    expect(s.params[0]).toBe('{"title":"T2"}');
+    expect(s.params[2]).toBe('r-1');
+  });
+
+  it('list додає equality-фільтри через json_extract з нумерованими плейсхолдерами', () => {
+    const s = buildListQuery(
+      { tenantId: 't1', appSlug: 'sd', actorId: null },
+      'ticket',
+      { filters: { status: 'new', priority: 'high' }, limit: 10 },
+    );
+    expect(s.sql).toContain("json_extract(data, '$.status') = ?4");
+    expect(s.sql).toContain("json_extract(data, '$.priority') = ?5");
+    expect(s.sql).toMatch(/LIMIT 10$/);
+    expect(s.params).toEqual(['t1', 'sd', 'ticket', 'new', 'high']);
+  });
+
+  it('ігнорує фільтри з небезпечними ключами', () => {
+    const s = buildListQuery(
+      { tenantId: 't1', appSlug: 'sd', actorId: null },
+      'ticket',
+      { filters: { "x'); DROP TABLE records; --": 1 } as unknown as Record<string, never> },
+    );
+    expect(s.sql).not.toContain('DROP');
+  });
+
+  it('soft delete ставить deleted_at лише для живих рядків', () => {
+    const s = buildSoftDelete('r-9');
+    expect(s.sql).toContain('deleted_at = ?1');
+    expect(s.sql).toContain('deleted_at IS NULL');
+    expect(s.params[1]).toBe('r-9');
+  });
+
+  it('audit серіалізує before/after як JSON', () => {
+    const s = buildAudit({
+      id: 'a-1',
+      tenantId: 't1',
+      actorId: null,
+      action: 'create',
+      resourceType: 'ticket',
+      resourceId: 'r-1',
+      before: null,
+      after: { title: 'T' },
+      occurredAt: '2026-08-23T00:00:00.000Z',
+    });
+    expect(s.params[6]).toBeNull();
+    expect(s.params[7]).toBe('{"title":"T"}');
+  });
+
+  it('outbox пише тип події', () => {
+    const s = buildOutbox({
+      id: 'o-1',
+      tenantId: 't1',
+      eventType: 'ticket.created',
+      payload: { recordId: 'r-1' },
+      createdAt: '2026-08-23T00:00:00.000Z',
+    });
+    expect(s.params[2]).toBe('ticket.created');
+    expect(s.params[3]).toBe('{"recordId":"r-1"}');
+  });
+});
