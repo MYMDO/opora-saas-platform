@@ -1,0 +1,163 @@
+{
+  "app": {
+    "slug": "service-desk",
+    "name": "Service Desk"
+  },
+  "entities": [
+    {
+      "apiName": "contact",
+      "label": "Контакт",
+      "fields": [
+        {
+          "name": "full_name",
+          "type": "text",
+          "required": true,
+          "maxLength": 200,
+          "label": "Повне імʼя"
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "maxLength": 200,
+          "label": "Email"
+        },
+        {
+          "name": "is_vip",
+          "type": "boolean",
+          "default": false,
+          "label": "VIP"
+        }
+      ]
+    },
+    {
+      "apiName": "ticket",
+      "label": "Заявка",
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "maxLength": 200,
+          "label": "Тема"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "options": [
+            "new",
+            "in_progress",
+            "done"
+          ],
+          "default": "new",
+          "label": "Статус"
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "options": [
+            "low",
+            "normal",
+            "high"
+          ],
+          "label": "Пріоритет"
+        },
+        {
+          "name": "requester",
+          "type": "relation",
+          "target": "contact",
+          "cardinality": "one",
+          "label": "Заявник"
+        },
+        {
+          "name": "due_at",
+          "type": "datetime",
+          "label": "Термін"
+        },
+        {
+          "name": "description",
+          "type": "longtext",
+          "label": "Опис"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "path": "/tickets",
+      "label": "Заявки",
+      "entity": "ticket",
+      "view": {
+        "kind": "table",
+        "columns": [
+          "title",
+          "status",
+          "priority",
+          "due_at"
+        ]
+      }
+    },
+    {
+      "path": "/tickets/new",
+      "label": "Нова заявка",
+      "entity": "ticket",
+      "view": {
+        "kind": "form",
+        "fields": [
+          "title",
+          "description",
+          "priority",
+          "requester"
+        ]
+      }
+    },
+    {
+      "path": "/contacts",
+      "label": "Контакти",
+      "entity": "contact",
+      "view": {
+        "kind": "table",
+        "columns": [
+          "full_name",
+          "email",
+          "is_vip"
+        ]
+      }
+    }
+  ],
+  "policies": [
+    {
+      "resource": "ticket",
+      "action": "read",
+      "allow": "role('agent') || record.ownerId == user.id"
+    },
+    {
+      "resource": "ticket",
+      "action": "create",
+      "allow": "role('requester') || role('agent')"
+    },
+    {
+      "resource": "contact",
+      "action": "read",
+      "allow": "role('agent')"
+    }
+  ],
+  "workflows": [
+    {
+      "on": "ticket.created",
+      "if": "record.status == 'new'",
+      "steps": [
+        {
+          "type": "assign",
+          "field": "owner_id",
+          "value": "firstAvailable('agent')"
+        },
+        {
+          "type": "webhook",
+          "connection": "slack-internal",
+          "event": "ticket.created"
+        }
+      ]
+    }
+  ]
+}

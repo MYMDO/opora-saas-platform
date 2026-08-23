@@ -1,37 +1,39 @@
 # AGENTS.md
 
-## Repo state
+## Що це за репозиторій
 
-- Product: **ОПОРА** — modular B2B SaaS platform for operational resilience of Ukrainian businesses. Three modules: ШІ-агенти (AI agents), Енергоменеджмент (EMS / BESS / solar tariff arbitrage), Фінанси та податки (VAT invoice limits, risk score, compliance deadlines).
-- Stack: **Vite 6 + React 19 + TypeScript (strict)**, recharts, lucide-react, vitest, ESLint 9 (flat config) + react-hooks rules. Backend (Phase 2): **Hono on Cloudflare Workers + D1** in `worker/` (own package.json/tsconfig; Free-Tier guardrails — no DO/Queues/KV-writes; tenant via `X-Opora-Tenant`, app-level tenancy since D1 has no RLS). SPA by design for Phase 1; Next.js migration is off the table while Pages serves the SPA.
-- Commands: `npm install` · `npm run dev` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run build`. CI runs them in that order plus `worker/` typecheck+tests (`.github/workflows/ci.yml`); run lint + typecheck + test after every change.
-- Worker commands: from `worker/` — `npm run dev` (local workerd+D1), `npm run db:migrate:local|--remote`, `npm run deploy` → https://opora-api.p4d-b2q.workers.dev (secondary channel)
-- Frontend deploy (from repo root): `npm run build && npx wrangler pages deploy dist --project-name opora-saas-platform` → https://opora-saas-platform.pages.dev. Deploy **`dist`, never `.`** — deploying the repo root serves raw sources (white page). `functions/` is picked from the repo root automatically; root `wrangler.toml` binds D1 to Pages; **API is same-origin via Pages Functions** (`functions/v1/[[path]].ts` reuses the worker's Hono app) — some UA networks block `*.workers.dev`, so the product must never depend on it; local dev proxies `/v1` via vite.config.ts
+**Конфігурована B2B SaaS-платформа** (Builder/Runtime, metadata control plane) —
+будується за блюпринтом після півота з вертикальної ОПОРИ (ADR 0001).
 
-## Files
+## Обов'язкові до прочитання
 
-- `src/` — canonical application code. Module boundaries follow the plan's bounded contexts:
-  - `src/app/` — shell (sidebar nav, status strip, hash-routed lazy tabs via `routing.ts`, tested parsers; unknown hashes fall back to overview) + `scenario.tsx` / `scenario-storage.ts` / `scenario-sync.ts` / `api.ts` — React-context scenario store with **offline-first cloud sync**: optimistic local state + fire-and-forget writes to the Workers API, boot-time `reconcile()` adopts remote rows when present and seeds an empty D1 from localStorage otherwise (`apiOnline` flag exposed; no external state libs; storage parsing lives in pure, tested `scenario-storage.ts`). Pages read snapshots via `useScenario()` and pass slices into `getFinanceSnapshot(scenario.finance)` / `getEnergySnapshot(...)`. Every lazy tab renders inside an `ErrorBoundary` with a retry action.
-  - `src/design-system/` — `tokens.css` (all CSS variables) + shared primitives (`KpiCard`, `ProgressBar`, `AlertRow`, `Eyebrow`, `Dot`, `ChartTooltip`)
-  - `src/modules/<name>/` — one folder per module (`overview`, `ai-agents`, `energy`, `finance`); each may expose `domain/` (pure logic), `data/` (fixtures), `ui/` (pages)
-- **Cross-module access goes only through a module's `index.ts` facade**, never deep-imports into another module's internals. The finance module demonstrates this.
-- `src/modules/finance/domain/` — deterministic tax rules (КМУ №1048 thresholds: 100k ₴/contractor, 1M ₴ total) and the weighted risk-score calculator. This is real business logic covered by vitest tests; change it only together with its tests and `ПЛАН_ОПОРА...md`.
-- `src/modules/hr/domain/` — booking compliance rules per КМУ №692 (salary threshold 25 941 ₴ / 21 600 ₴ frontline, quotas 50%/100%, no tax debt) plus bulk roster assessment (`assessBookingRoster`). Same rule applies: logic + tests change together.
-- `src/modules/energy/domain/` — BESS tariff-arbitrage model (DoD × round-trip efficiency × day/night spread − degradation cost) and payback calculator; `MARKET_TARIFFS` are the single source for НКРЕКП tariff figures used in UI copy too. Same rule applies: logic + tests change together.
-- `src/modules/billing/domain/` — hybrid pricing engine (platform fee + per-resolution outcome with included allowance + EMS fixed/share/capacity modes) per plan §2.4; `PLANS` is the single source for tariff-plan figures shown in UI. Same rule applies: logic + tests change together.
-- `src/modules/*/data/fixtures.ts` — hardcoded demo data (there is no backend yet). AI-agent chat replies come from a canned bank cycled by modulo.
-- `opora-saas-platform.jsx` — legacy single-file prototype kept as visual reference only; do not extend it. Port anything needed into `src/`.
-- `worker/` — Cloudflare Workers API (Phase 2 skeleton): Hono routes mirror the frontend scenario ops (`finance/contractors`, `hr/employees`, `hr/enterprise`) over D1; tests stub D1 via `test/fakeD1.ts`. Money columns are INTEGER ₴; every query filters by `tenant_id` from `resolveTenant()`.
-- Filenames contain Cyrillic characters and spaces — always quote paths in shell commands.
+1. `docs/blueprint/saas-platform-blueprint.md` — **головна специфікація**: архітектура,
+   DSL, модель метаданих, етапи. Не відступати без ADR.
+2. `docs/architecture/decision-records/` — ухвалені рішення (почитайте 0001 про півот).
+3. `docs/research/ПЛАН_ОПОРА...md` — доменні знання колишньої ОПОРИ (КМУ №692/1048,
+   тарифи НКРЕКП); стане в нагоді, коли модулі ОПОРИ повернуться як конфгуровані застосунки.
+4. `reference/opora-v1/` — **заморожений референс** попередньої реалізації.
+   Читати можна; імпортувати чи розширювати — ні.
 
-## Strategy & architecture
+## Структура (pnpm workspaces + Turborepo)
 
-- `ПЛАН_ОПОРА_Дослідження_та_Архітектура.md` — comprehensive research, fact-check, and architecture plan (v1.0). Read it before making product or architecture decisions; it fact-checks all 131 sources from both research docs, justifies the 3-module focus (HR/AI, EMS, Finance) over 6 alternative domains, and defines the 18-month phased roadmap. Structure is reasoning-first then conclusions.
-- If you change scope, pricing, or architecture, update that plan — it is the single source of truth for strategic decisions.
+- `packages/dsl` — Zod-схеми DSL + `parseAppDefinition`. **Єдиний експорт:**
+  `parseAppDefinition`, типи `AppDefinition*`, клас `AppDefinitionError`.
+  Вирази (`allow`, `if`) тут НЕ виконуються і не парсяться.
+- Наступні пакети (у черзі): `metadata`, `data-runtime`, `policy`, `ui-renderer`,
+  `workflow`, `apps/api`, `apps/builder-web`, `apps/runtime-web`.
 
-## Conventions
+## Команди
 
-- All product copy is **Ukrainian**; use `uk-UA` formatting via helpers in `src/lib/format.ts` (never raw `toLocaleString` scattered around). Keep new UI text in Ukrainian.
-- Preserve the module→color mapping from `tokens.css`: AI `--ai` (teal), Energy `--energy` (amber), Finance `--finance` (green), plus `--danger` (red); dark theme `--bg: #14171A`; fonts IBM Plex (Sans / Sans Condensed for display / Mono) loaded in `index.html`.
-- Shared control styles live in `tokens.css`: `.btn` variants (`btn-solid`, `btn-finance`, `btn-surface`, `btn-icon`, `btn-ghost`) and `.input-row` (incl. styled `select`). Prefer them over bespoke inline button/input styles; dates render via `formatDateUa`, never raw ISO strings.
-- No comments in code unless asked; domain constants carry legal meaning through naming (e.g., `VAT_RULES`) — keep names precise.
+- `pnpm install`
+- `pnpm lint` · `pnpm typecheck` · `pnpm test` (turbo пробігає всі пакети)
+- точково: `pnpm --filter @opora/dsl test`
+
+## Правила
+
+- Межі пакетів за §7 блюпринта: `ui-renderer` не торкається БД;
+  `dsl` не залежить від Next.js/PostgreSQL; `workflow` лише через контракти data-runtime.
+- Кожна зміна даних у майбутньому runtime — з audit event; tenant boundary тестується.
+- Задачі агентам ставити вузько (приклад — §11 блюпринта), з критеріями готовності:
+  код + тести + контракт + оновлений fixture/DSL приклад.
+- Усі продуктові тексти — українською; форматування чисел/дат uk-UA.
