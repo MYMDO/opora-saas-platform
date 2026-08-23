@@ -12,19 +12,24 @@ import {
 const employeeRoutes = () =>
   crudRoutes({
     table: 'employees',
-    columns: 'id, name, monthly_salary_uah',
+    columns: 'id, name, monthly_salary_uah, is_military_obliged',
     mapRow: (r) => ({
       id: String(r.id),
       name: String(r.name),
       monthlySalaryUah: Number(r.monthly_salary_uah),
+      isMilitaryObliged: Number(r.is_military_obliged) === 1,
     }),
     createSchema: employeeCreateSchema,
     patchSchema: employeePatchSchema,
     patchColumns: {
       name: 'name',
       monthlySalaryUah: 'monthly_salary_uah',
+      isMilitaryObliged: 'is_military_obliged',
     },
-    createColumns: (v) => [{ column: 'monthly_salary_uah', value: v.monthlySalaryUah }],
+    createColumns: (v) => [
+      { column: 'monthly_salary_uah', value: v.monthlySalaryUah },
+      { column: 'is_military_obliged', value: v.isMilitaryObliged ? 1 : 0 },
+    ],
     notFoundLabel: 'Працівника не знайдено',
   });
 

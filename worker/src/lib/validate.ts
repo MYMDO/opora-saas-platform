@@ -27,12 +27,14 @@ export const employeeCreateSchema = z.object({
   id: clientUuid.optional(),
   name: z.string().trim().min(1).max(120),
   monthlySalaryUah: uahInt,
+  isMilitaryObliged: z.boolean().optional().default(true),
 });
 
 export const employeePatchSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
     monthlySalaryUah: uahInt.optional(),
+    isMilitaryObliged: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Порожній патч' });
 

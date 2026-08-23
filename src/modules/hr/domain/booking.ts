@@ -11,9 +11,12 @@ export interface EnterpriseBookingContext {
 
 export interface EmployeeBookingRequest {
   readonly monthlySalaryUah: number;
+  /** Військовозобов'язаність: чоловіки 18–60 автоматично; жінки — за переліком МОУ №313 */
+  readonly isMilitaryObliged: boolean;
 }
 
 export type BookingBlocker =
+  | { readonly kind: 'not-military-obliged' }
   | { readonly kind: 'critical-status-missing' }
   | { readonly kind: 'tax-debt' }
   | { readonly kind: 'salary-below-threshold'; readonly requiredUah: number; readonly actualUah: number }
@@ -50,9 +53,20 @@ export function assessEmployeeBooking(
   request: EmployeeBookingRequest,
   ctx: EnterpriseBookingContext,
 ): BookingAssessment {
-  const blockers: BookingBlocker[] = [];
   const threshold = salaryThreshold(ctx);
   const slots = quotaSlots(ctx);
+
+  // Бронювання застосовується лише до військовозобов'язаних: для решти перевірки нерелевантні.
+  if (!request.isMilitaryObliged) {
+    return {
+      eligible: false,
+      blockers: [{ kind: 'not-military-obliged' }],
+      requiredSalaryThresholdUah: threshold,
+      quotaSlots: slots,
+    };
+  }
+
+  const blockers: BookingBlocker[] = [];
 
   if (!ctx.hasCriticalEnterpriseStatus) {
     blockers.push({ kind: 'critical-status-missing' });

@@ -13,14 +13,14 @@ const baseCtx: EnterpriseBookingContext = {
 
 describe('assessEmployeeBooking', () => {
   it('approves a compliant candidate', () => {
-    const r = assessEmployeeBooking({ monthlySalaryUah: 26_000 }, baseCtx);
+    const r = assessEmployeeBooking({ isMilitaryObliged: true, monthlySalaryUah: 26_000 }, baseCtx);
     expect(r.eligible).toBe(true);
     expect(r.blockers).toHaveLength(0);
     expect(r.requiredSalaryThresholdUah).toBe(25_941);
   });
 
   it('rejects salary below the standard threshold', () => {
-    const r = assessEmployeeBooking({ monthlySalaryUah: 25_000 }, baseCtx);
+    const r = assessEmployeeBooking({ isMilitaryObliged: true, monthlySalaryUah: 25_000 }, baseCtx);
     expect(r.eligible).toBe(false);
     expect(r.blockers).toContainEqual({
       kind: 'salary-below-threshold',
@@ -31,19 +31,19 @@ describe('assessEmployeeBooking', () => {
 
   it('applies the frontline exception threshold', () => {
     const frontline = { ...baseCtx, territoryType: 'frontline' as const };
-    expect(assessEmployeeBooking({ monthlySalaryUah: 22_000 }, frontline).eligible).toBe(true);
-    expect(assessEmployeeBooking({ monthlySalaryUah: 22_000 }, baseCtx).eligible).toBe(false);
-    expect(assessEmployeeBooking({ monthlySalaryUah: 21_500 }, frontline).eligible).toBe(false);
+    expect(assessEmployeeBooking({ isMilitaryObliged: true, monthlySalaryUah: 22_000 }, frontline).eligible).toBe(true);
+    expect(assessEmployeeBooking({ isMilitaryObliged: true, monthlySalaryUah: 22_000 }, baseCtx).eligible).toBe(false);
+    expect(assessEmployeeBooking({ isMilitaryObliged: true, monthlySalaryUah: 21_500 }, frontline).eligible).toBe(false);
   });
 
   it('flags tax debt', () => {
-    const r = assessEmployeeBooking({ monthlySalaryUah: 30_000 }, { ...baseCtx, hasTaxDebt: true });
+    const r = assessEmployeeBooking({ isMilitaryObliged: true, monthlySalaryUah: 30_000 }, { ...baseCtx, hasTaxDebt: true });
     expect(r.blockers.some((b) => b.kind === 'tax-debt')).toBe(true);
   });
 
   it('flags missing critical enterprise status', () => {
     const r = assessEmployeeBooking(
-      { monthlySalaryUah: 30_000 },
+      { isMilitaryObliged: true, monthlySalaryUah: 30_000 },
       { ...baseCtx, hasCriticalEnterpriseStatus: false },
     );
     expect(r.blockers.some((b) => b.kind === 'critical-status-missing')).toBe(true);
@@ -51,13 +51,13 @@ describe('assessEmployeeBooking', () => {
 
   it('enforces the 50% default quota', () => {
     const ctx = { ...baseCtx, alreadyBookedCount: 10 };
-    const r = assessEmployeeBooking({ monthlySalaryUah: 30_000 }, ctx);
+    const r = assessEmployeeBooking({ isMilitaryObliged: true, monthlySalaryUah: 30_000 }, ctx);
     expect(r.blockers).toContainEqual({ kind: 'quota-exhausted', limitSlots: 10 });
   });
 
   it('raises quota to 100% for critical industries', () => {
     const ctx = { ...baseCtx, isCriticalIndustry: true, alreadyBookedCount: 15 };
-    const r = assessEmployeeBooking({ monthlySalaryUah: 30_000 }, ctx);
+    const r = assessEmployeeBooking({ isMilitaryObliged: true, monthlySalaryUah: 30_000 }, ctx);
     expect(r.eligible).toBe(true);
     expect(r.quotaSlots).toBe(20);
   });
@@ -71,7 +71,7 @@ describe('assessEmployeeBooking', () => {
       militaryObligatedCount: 4,
       alreadyBookedCount: 2,
     };
-    const r = assessEmployeeBooking({ monthlySalaryUah: 10_000 }, ctx);
+    const r = assessEmployeeBooking({ isMilitaryObliged: true, monthlySalaryUah: 10_000 }, ctx);
     expect(r.eligible).toBe(false);
     expect(r.blockers.map((b) => b.kind)).toEqual([
       'critical-status-missing',
@@ -89,5 +89,14 @@ describe('quota math', () => {
 
   it('never returns negative remaining slots', () => {
     expect(remainingBookingSlots({ ...baseCtx, alreadyBookedCount: 99 })).toBe(0);
+  });
+});
+
+describe('military liability gate', () => {
+  it('short-circuits non-obligated employees before any other checks', () => {
+    const r = assessEmployeeBooking({ isMilitaryObliged: false, monthlySalaryUah: 50_000 }, baseCtx);
+    expect(r.eligible).toBe(false);
+    expect(r.blockers).toEqual([{ kind: 'not-military-obliged' }]);
+    expect(r.requiredSalaryThresholdUah).toBe(25_941);
   });
 });

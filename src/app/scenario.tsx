@@ -143,6 +143,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
           id: crypto.randomUUID(),
           name: clean,
           monthlySalaryUah: Math.max(0, monthlySalaryUah),
+          isMilitaryObliged: true,
         };
         setScenario((prev) => ({
           ...prev,

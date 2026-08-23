@@ -232,3 +232,10 @@ describe('opora-api', () => {
     expect(db.calls('FROM contractors')[0]?.params[0]).toBe('demo');
   });
 });
+
+describe('caching discipline', () => {
+  it('marks every /v1 response as no-store', async () => {
+    const res = await client(new FakeD1([{ test: () => true, handle: () => [] }])).request('/v1/finance/contractors');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+});

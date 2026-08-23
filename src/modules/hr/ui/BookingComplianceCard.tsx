@@ -25,6 +25,8 @@ const inputStyle: CSSProperties = {
 
 function blockerText(b: BookingBlocker): string {
   switch (b.kind) {
+    case 'not-military-obliged':
+      return 'Не є військовозобов’язаним — бронювання не застосовується';
     case 'critical-status-missing':
       return 'Немає статусу критично важливого підприємства';
     case 'tax-debt':
@@ -103,7 +105,8 @@ export function BookingComplianceCard() {
         Реєстр працівників і відповідність (КМУ №692)
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--text-mute)', marginBottom: 14 }}>
-        Поріг зарплати — {formatNumberUa(threshold)} ₴ · розгляд заявки до 10 днів
+        Поріг зарплати — {formatNumberUa(threshold)} ₴ · розгляд до 10 днів · стосується
+        військовозобов'язаних (чоловіки 18–60; жінки за переліком МОУ №313 — медицина/фармація)
       </div>
 
       <div
@@ -246,17 +249,51 @@ export function BookingComplianceCard() {
                   title="Місячна зарплата, ₴"
                   style={{ ...inputStyle, width: 104, flexShrink: 0 }}
                 />
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 11,
+                    color: 'var(--text-dim)',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                  title="Військовозобов'язаний/-а (чоловіки 18–60; жінки за переліком МОУ №313)"
+                >
+                  <input
+                    type="checkbox"
+                    checked={row.isMilitaryObliged}
+                    onChange={(e) => updateEmployee(row.id, { isMilitaryObliged: e.target.checked })}
+                    style={{ accentColor: 'var(--ai)' }}
+                  />
+                  В/з
+                </label>
                 <span
                   className="chip f-mono"
                   title={row.eligible ? undefined : blockerText(row.blockers[0])}
                   style={{
                     flexShrink: 0,
-                    background: row.eligible ? 'var(--finance-dim)' : 'var(--danger-dim)',
-                    color: row.eligible ? 'var(--finance)' : 'var(--danger)',
+                    background:
+                      row.blockers[0]?.kind === 'not-military-obliged'
+                        ? 'var(--surface-2)'
+                        : row.eligible
+                          ? 'var(--finance-dim)'
+                          : 'var(--danger-dim)',
+                    color:
+                      row.blockers[0]?.kind === 'not-military-obliged'
+                        ? 'var(--text-mute)'
+                        : row.eligible
+                          ? 'var(--finance)'
+                          : 'var(--danger)',
                     cursor: row.eligible ? 'default' : 'help',
                   }}
                 >
-                  {row.eligible ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+                  {row.eligible
+                    ? <CheckCircle2 size={12} />
+                    : row.blockers[0]?.kind === 'not-military-obliged'
+                      ? '—'
+                      : <AlertTriangle size={12} />}
                 </span>
                 <button
                   onClick={() => removeEmployee(row.id)}

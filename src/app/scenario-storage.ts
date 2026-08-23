@@ -87,16 +87,17 @@ function parseEmployees(raw: unknown, fallback: ReadonlyArray<EmployeeRow>): HrS
   if (!Array.isArray(raw)) return fallback;
   return raw
     .filter(
-      (r): r is EmployeeRow =>
+      (r): r is Record<string, unknown> =>
         r != null &&
-        typeof r.id === 'string' &&
         typeof r.name === 'string' &&
         Number.isFinite(r.monthlySalaryUah),
     )
     .map((r) => ({
+      // Легасі-рядки без прапорця вважаємо військовозобов'язаними (консервативно).
       id: safeId(r.id),
       name: String(r.name),
       monthlySalaryUah: Number(r.monthlySalaryUah),
+      isMilitaryObliged: r.isMilitaryObliged !== false,
     }));
 }
 

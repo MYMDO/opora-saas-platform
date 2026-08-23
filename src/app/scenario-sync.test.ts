@@ -13,7 +13,7 @@ describe('reconcile', () => {
     const local = localScenario();
     const remote = {
       contractors: [{ id: 'r1', name: 'Віддалений', usedUah: 1, limitUah: 100 }],
-      employees: [{ id: 're1', name: 'Працівник', monthlySalaryUah: 20_000 }],
+      employees: [{ id: 're1', name: 'Працівник', monthlySalaryUah: 20_000, isMilitaryObliged: true }],
       enterprise: {
         territoryType: 'frontline' as const,
         hasCriticalEnterpriseStatus: true,

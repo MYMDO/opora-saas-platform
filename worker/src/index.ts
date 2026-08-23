@@ -19,6 +19,11 @@ export function createApp(env: Env) {
     await next();
   });
 
+  app.use('/v1/*', async (c, next) => {
+    c.header('Cache-Control', 'no-store');
+    await next();
+  });
+
   app.get('/v1/health', async (c) => {
     await c.env.DB.prepare('SELECT 1 AS ok').first();
     return c.json({ ok: true, service: 'opora-api', ts: new Date().toISOString() });

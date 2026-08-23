@@ -42,7 +42,12 @@ export const api = {
   createEmployee: (row: EmployeeRow) =>
     req<unknown>('/v1/hr/employees', {
       method: 'POST',
-      body: JSON.stringify({ id: row.id, name: row.name, monthlySalaryUah: row.monthlySalaryUah }),
+      body: JSON.stringify({
+        id: row.id,
+        name: row.name,
+        monthlySalaryUah: row.monthlySalaryUah,
+        isMilitaryObliged: row.isMilitaryObliged,
+      }),
     }),
   patchEmployee: (id: string, patch: Partial<Omit<EmployeeRow, 'id'>>) =>
     req<unknown>(`/v1/hr/employees/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),

@@ -4,6 +4,8 @@ export interface EmployeeRow {
   readonly id: string;
   readonly name: string;
   readonly monthlySalaryUah: number;
+  /** Чи перебуває особа на військовому обліку (чоловіки 18–60; жінки — за переліком МОУ №313) */
+  readonly isMilitaryObliged: boolean;
 }
 
 export interface HrScenario {
@@ -15,6 +17,7 @@ export interface RosterRowResult extends BookingAssessment {
   readonly id: string;
   readonly name: string;
   readonly monthlySalaryUah: number;
+  readonly isMilitaryObliged: boolean;
 }
 
 export interface RosterAssessment {
@@ -30,7 +33,11 @@ export function assessBookingRoster(
     id: e.id,
     name: e.name,
     monthlySalaryUah: e.monthlySalaryUah,
-    ...assessEmployeeBooking({ monthlySalaryUah: e.monthlySalaryUah }, ctx),
+    isMilitaryObliged: e.isMilitaryObliged,
+    ...assessEmployeeBooking(
+      { monthlySalaryUah: e.monthlySalaryUah, isMilitaryObliged: e.isMilitaryObliged },
+      ctx,
+    ),
   }));
   return { rows, eligibleCount: rows.filter((r) => r.eligible).length };
 }
