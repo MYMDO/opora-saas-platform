@@ -4,7 +4,6 @@ import {
   Bot,
   Building2,
   ChevronDown,
-  Cloud,
   LayoutDashboard,
   ShieldCheck,
   Sparkles,
@@ -188,23 +187,29 @@ export default function App() {
             text={`Ризик ${finance.risk.scorePercent}% · ${finance.risk.label}`}
           />
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 16 }}>
-            <StatusMetric
-              Icon={Cloud}
-              color={
-                apiOnline == null
-                  ? 'var(--text-mute)'
-                  : apiOnline
-                    ? 'var(--finance)'
-                    : 'var(--danger)'
+            <div
+              title={
+                apiOnline === false && syncError ? `Причина: ${syncError}` : undefined
               }
-              text={
-                apiOnline == null
+              style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: apiOnline === false ? 'help' : 'default' }}
+            >
+              <Dot
+                color={
+                  apiOnline == null
+                    ? 'var(--text-mute)'
+                    : apiOnline
+                      ? 'var(--finance)'
+                      : 'var(--danger)'
+                }
+              />
+              <span className="f-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                {apiOnline == null
                   ? 'Хмара: перевірка…'
                   : apiOnline
                     ? 'Хмара: онлайн'
-                    : `Хмара: офлайн · ${syncError ?? 'невідома причина'}`
-              }
-            />
+                    : 'Хмара: офлайн · локальний режим'}
+              </span>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Bell size={14} color="var(--text-mute)" />
               <span className="f-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
