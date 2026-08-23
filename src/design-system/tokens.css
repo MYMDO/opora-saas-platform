@@ -1,0 +1,180 @@
+.opora-root {
+  --bg: #14171a;
+  --surface: #1b1f23;
+  --surface-2: #22272c;
+  --surface-hover: #282e34;
+  --border: #2b3137;
+  --border-light: #363d44;
+  --text: #edeef0;
+  --text-dim: #9aa1a9;
+  --text-mute: #676d74;
+  --energy: #f2a93b;
+  --energy-dim: rgba(242, 169, 59, 0.14);
+  --ai: #3fc7b8;
+  --ai-dim: rgba(63, 199, 184, 0.14);
+  --finance: #8cc97a;
+  --finance-dim: rgba(140, 201, 122, 0.14);
+  --danger: #e5573f;
+  --danger-dim: rgba(229, 87, 63, 0.14);
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', sans-serif;
+  min-height: 100%;
+  width: 100%;
+}
+
+.opora-root * {
+  box-sizing: border-box;
+}
+
+.f-display {
+  font-family: 'IBM Plex Sans Condensed', sans-serif;
+}
+
+.f-mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.panel-2 {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-dim);
+  border-left: 2px solid transparent;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.nav-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--surface-2);
+  color: var(--text);
+  border-left: 2px solid var(--accent, #3fc7b8);
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.pulse {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.25s ease;
+}
+
+.opora-root ::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.opora-root ::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 4px;
+}
+
+.opora-root ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.agent-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.agent-card:hover {
+  border-color: var(--border-light);
+  background: var(--surface-2);
+}
+
+.agent-card.selected {
+  border-color: var(--ai);
+  background: var(--ai-dim);
+}
+
+.bar-track {
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+  height: 6px;
+}
+
+.chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.input-row input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.input-row input::placeholder {
+  color: var(--text-mute);
+}
+
+.input-row input:focus {
+  outline: none;
+  border-color: var(--ai);
+}
+
+@media (max-width: 720px) {
+  .hidden-mobile {
+    display: none !important;
+  }
+  .mobile-nav {
+    display: flex !important;
+  }
+  .opora-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
