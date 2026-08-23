@@ -151,6 +151,7 @@ function sanitizeArbitrageOverrides(raw: unknown): Partial<ArbitrageParams> {
 interface ScenarioContextValue {
   readonly scenario: AppScenario;
   readonly apiOnline: boolean | null;
+  readonly syncError: string | null;
   updateContractor(index: number, patch: Partial<Omit<ContractorRow, 'id'>>): void;
   addContractor(name: string): void;
   removeContractor(index: number): void;
@@ -167,6 +168,7 @@ const ScenarioContext = createContext<ScenarioContextValue | null>(null);
 export function ScenarioProvider({ children }: { children: ReactNode }) {
   const [scenario, setScenario] = useState<AppScenario>(loadInitial);
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -197,8 +199,12 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
         }
         if (!cancelled) setApiOnline(true);
       } catch (err) {
-        console.warn('[ОПОРА] API недоступний — працюємо на локальному сценарії', err);
-        if (!cancelled) setApiOnline(false);
+        const reason = err instanceof Error ? err.message : String(err);
+        console.warn('[ОПОРА] API недоступний — працюємо на локальному сценарії:', err);
+        if (!cancelled) {
+          setApiOnline(false);
+          setSyncError(reason.slice(0, 120));
+        }
       }
     })();
     return () => {
@@ -212,6 +218,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
     return {
       scenario,
       apiOnline,
+      syncError,
       updateContractor: (index, patch) => {
         const row = scenario.finance.contractors[index];
         setScenario((prev) => ({
@@ -316,7 +323,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
         })();
       },
     };
-  }, [scenario, apiOnline]);
+  }, [scenario, apiOnline, syncError]);
 
   return <ScenarioContext.Provider value={value}>{children}</ScenarioContext.Provider>;
 }

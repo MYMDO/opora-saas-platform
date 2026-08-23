@@ -6,7 +6,7 @@ export const API_BASE_URL: string =
   ((import.meta.env?.VITE_API_BASE as string | undefined) ?? '').trim();
 
 const TENANT = 'demo';
-const TIMEOUT_MS = 4_000;
+const TIMEOUT_MS = 8_000;
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();

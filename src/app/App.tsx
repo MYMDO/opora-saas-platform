@@ -92,7 +92,7 @@ export default function App() {
     document.title = `${NAV.find((n) => n.id === tab)?.label ?? 'Огляд'} · ОПОРА`;
   }, [tab]);
 
-  const { scenario, apiOnline } = useScenario();
+  const { scenario, apiOnline, syncError } = useScenario();
   const finance = getFinanceSnapshot(scenario.finance);
   const energy = getEnergySnapshot();
 
@@ -202,7 +202,7 @@ export default function App() {
                   ? 'Хмара: перевірка…'
                   : apiOnline
                     ? 'Хмара: онлайн'
-                    : 'Хмара: офлайн · локальний режим'
+                    : `Хмара: офлайн · ${syncError ?? 'невідома причина'}`
               }
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
