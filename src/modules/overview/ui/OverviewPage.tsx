@@ -23,6 +23,7 @@ import {
 } from '../../billing/index';
 import { DEMO_ENTERPRISE } from '../../hr/index';
 import { buildDailyActions, MODULE_LABELS, type DailyAction } from '../domain/actions';
+import { useScenario } from '../../../app/scenario';
 
 const SEVERITY_STYLE = {
   danger: { color: 'var(--danger)', dim: 'var(--danger-dim)' },
@@ -107,7 +108,8 @@ function BillingRow({ label, value, note, color }: { label: string; value: strin
 }
 
 export function OverviewPage() {
-  const finance = getFinanceSnapshot();
+  const { finance: scenario } = useScenario();
+  const finance = getFinanceSnapshot(scenario);
   const energy = getEnergySnapshot();
 
   const actions = buildDailyActions({

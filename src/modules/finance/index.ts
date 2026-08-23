@@ -5,9 +5,13 @@ import {
 import { daysUntil, deadlineTone, type ComplianceDeadline } from './domain/deadlines';
 import { limitLevel, type LimitLevel } from './domain/taxRules';
 import {
-  ADJUSTMENT_WINDOW_DAYS_TO_CLOSE,
+  defaultFinanceScenario,
+  listedTotalUah,
+  UNLISTED_CONTRACTORS_BASE_UAH,
+  type FinanceScenario,
+} from './domain/scenario';
+import {
   COMPLIANCE_DEADLINES,
-  CONTRACTORS,
   TAX_HISTORY,
   TOTAL_SUPPLY,
 } from './data/fixtures';
@@ -31,19 +35,24 @@ export interface FinanceSnapshot {
   readonly deadlines: ReadonlyArray<DeadlineView>;
 }
 
-export function getFinanceSnapshot(): FinanceSnapshot {
-  const contractors: ContractorUsageView[] = CONTRACTORS.map((c) => ({
+export function getFinanceSnapshot(
+  scenario: FinanceScenario = defaultFinanceScenario(),
+): FinanceSnapshot {
+  const contractors: ContractorUsageView[] = scenario.contractors.map((c) => ({
     name: c.name,
     usedUah: c.usedUah,
     limitUah: c.limitUah,
     level: limitLevel(c.usedUah, c.limitUah),
   }));
 
+  const totalUsedUah =
+    UNLISTED_CONTRACTORS_BASE_UAH + listedTotalUah(scenario.contractors);
+
   const risk = assessTaxRisk({
-    totalUsedUah: TOTAL_SUPPLY.usedUah,
+    totalUsedUah,
     totalSupplyLimitUah: TOTAL_SUPPLY.limitUah,
     positiveTaxHistory: TAX_HISTORY.positiveTaxHistory,
-    daysToAdjustmentWindowClose: ADJUSTMENT_WINDOW_DAYS_TO_CLOSE,
+    daysToAdjustmentWindowClose: scenario.adjustmentWindowDays,
     invoiceBlockingsLast12m: TAX_HISTORY.invoiceBlockingsLast12m,
   });
 
@@ -52,8 +61,22 @@ export function getFinanceSnapshot(): FinanceSnapshot {
     return { ...d, daysLeft, tone: deadlineTone(daysLeft) };
   });
 
-  return { contractors, totals: { ...TOTAL_SUPPLY }, risk, deadlines };
+  return {
+    contractors,
+    totals: { usedUah: totalUsedUah, limitUah: TOTAL_SUPPLY.limitUah },
+    risk,
+    deadlines,
+  };
 }
 
 export { VAT_RULES, limitLevel, usagePercent } from './domain/taxRules';
 export { assessTaxRisk, contractorsAtRisk } from './domain/riskScore';
+export {
+  addContractor,
+  defaultFinanceScenario,
+  removeContractor,
+  updateContractor,
+  UNLISTED_CONTRACTORS_BASE_UAH,
+  type ContractorRow,
+  type FinanceScenario,
+} from './domain/scenario';

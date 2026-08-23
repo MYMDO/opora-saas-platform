@@ -9,7 +9,7 @@
 ## Files
 
 - `src/` — canonical application code. Module boundaries follow the plan's bounded contexts:
-  - `src/app/` — shell (sidebar nav, status strip, lazy tab routing)
+  - `src/app/` — shell (sidebar nav, status strip, lazy tab routing) + `scenario.tsx` (React-context store for editable scenario state — no external state libs; pages read snapshots via `useScenario()` and pass the scenario into `getFinanceSnapshot(scenario)`)
   - `src/design-system/` — `tokens.css` (all CSS variables) + shared primitives (`KpiCard`, `ProgressBar`, `AlertRow`, `Eyebrow`, `Dot`, `ChartTooltip`)
   - `src/modules/<name>/` — one folder per module (`overview`, `ai-agents`, `energy`, `finance`); each may expose `domain/` (pure logic), `data/` (fixtures), `ui/` (pages)
 - **Cross-module access goes only through a module's `index.ts` facade**, never deep-imports into another module's internals. The finance module demonstrates this.

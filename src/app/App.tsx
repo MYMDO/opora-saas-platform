@@ -15,6 +15,7 @@ import { formatNumberUa, formatTimeUa } from '../lib/format';
 import { TODAY_AI_RESOLVED } from '../modules/ai-agents/index';
 import { getEnergySnapshot } from '../modules/energy/index';
 import { getFinanceSnapshot } from '../modules/finance/index';
+import { useScenario } from './scenario';
 
 const OverviewPage = lazy(() =>
   import('../modules/overview/ui/OverviewPage').then((m) => ({ default: m.OverviewPage })),
@@ -76,7 +77,8 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
 
-  const finance = getFinanceSnapshot();
+  const { finance: scenario } = useScenario();
+  const finance = getFinanceSnapshot(scenario);
   const energy = getEnergySnapshot();
 
   return (

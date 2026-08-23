@@ -1,13 +1,81 @@
-import { AlertTriangle, Clock, FileText, ShieldCheck } from 'lucide-react';
-import { Area, ComposedChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { KpiCard, ProgressBar, Eyebrow, ChartTooltip } from '../../../design-system/components';
-import { formatNumberUa } from '../../../lib/format';
-import { getFinanceSnapshot } from '../index';
+import { useState, type CSSProperties } from 'react';
+import { AlertTriangle, Clock, FileText, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { ChartTooltip, Eyebrow, KpiCard, ProgressBar } from '../../../design-system/components';
+import { formatDecimalUa, formatNumberUa } from '../../../lib/format';
+import { getFinanceSnapshot, VAT_RULES } from '../index';
+import { useScenario } from '../../../app/scenario';
 import { RISK_TREND } from '../data/fixtures';
 
+const inputStyle: CSSProperties = {
+  padding: '7px 10px',
+  borderRadius: 6,
+  fontSize: 12.5,
+};
+
+function DeadlineList({
+  deadlines,
+}: {
+  deadlines: ReadonlyArray<{
+    id: string;
+    title: string;
+    dueDateIso: string;
+    daysLeft: number;
+    tone: 'danger' | 'neutral';
+  }>;
+}) {
+  return (
+    <div style={{ marginTop: 10, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+      <Eyebrow>Найближчі дедлайни</Eyebrow>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
+        {deadlines.map((d) => (
+          <div
+            key={d.id}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+          >
+            <div>
+              <div style={{ fontSize: 12.5 }}>{d.title}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-mute)' }}>{d.dueDateIso}</div>
+            </div>
+            <span
+              className="chip f-mono"
+              style={{
+                background: d.tone === 'danger' ? 'var(--danger-dim)' : 'var(--surface-2)',
+                color: d.tone === 'danger' ? 'var(--danger)' : 'var(--text-dim)',
+              }}
+            >
+              {d.daysLeft} дн.
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function FinancePage() {
-  const snapshot = getFinanceSnapshot();
+  const { finance: scenario, updateContractor, addContractor, removeContractor } = useScenario();
+  const [newName, setNewName] = useState('');
+  const snapshot = getFinanceSnapshot(scenario);
   const { contractors, totals, risk, deadlines } = snapshot;
+
+  function submitNew() {
+    if (!newName.trim()) return;
+    addContractor(newName);
+    setNewName('');
+  }
+
+  function clampUah(value: string): number {
+    return Math.max(0, Number(value) || 0);
+  }
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -46,36 +114,121 @@ export function FinancePage() {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr)', gap: 16 }} className="opora-grid-2">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr)',
+          gap: 16,
+        }}
+        className="opora-grid-2"
+      >
         <div className="panel" style={{ padding: 18 }}>
-          <Eyebrow color="var(--finance)">Ліміти реєстрації ПН</Eyebrow>
+          <Eyebrow color="var(--finance)">Ліміти реєстрації ПН · інтерактивно</Eyebrow>
           <div className="f-display" style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
             Обсяг постачання на контрагента
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--text-mute)', marginBottom: 14 }}>
-            Поріг безумовної реєстрації — {formatNumberUa(totals.limitUah / 10)} ₴ на контрагента
+            Поріг безумовної реєстрації — {formatNumberUa(VAT_RULES.perContractorLimitUah)} ₴ на
+            контрагента. Змініть суми — ризик-скор перерахується миттєво.
           </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {contractors.map((c) => (
-              <div key={c.name}>
+            {scenario.contractors.map((c, i) => (
+              <div key={`${c.name}-${i}`}>
                 <div
                   style={{
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: 12.5,
-                    marginBottom: 5,
+                    gap: 8,
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
                   }}
                 >
-                  <span>{c.name}</span>
-                  <span className="f-mono" style={{ color: 'var(--text-dim)' }}>
-                    {formatNumberUa(c.usedUah)} / {formatNumberUa(c.limitUah)} ₴
-                  </span>
+                  <input
+                    className="input-row"
+                    value={c.name}
+                    onChange={(e) => updateContractor(i, { name: e.target.value })}
+                    aria-label={`Назва контрагента ${i + 1}`}
+                    style={{ ...inputStyle, flex: '1 1 150px' }}
+                  />
+                  <input
+                    type="number"
+                    className="input-row"
+                    value={c.usedUah}
+                    min={0}
+                    step={1000}
+                    onChange={(e) => updateContractor(i, { usedUah: clampUah(e.target.value) })}
+                    aria-label={`Обсяг постачання, ${c.name}`}
+                    title="Обсяг постачання, ₴"
+                    style={{ ...inputStyle, width: 110 }}
+                  />
+                  <input
+                    type="number"
+                    className="input-row"
+                    value={c.limitUah}
+                    min={0}
+                    step={5000}
+                    onChange={(e) => updateContractor(i, { limitUah: clampUah(e.target.value) })}
+                    aria-label={`Ліміт, ${c.name}`}
+                    title="Ліміт, ₴"
+                    style={{ ...inputStyle, width: 104 }}
+                  />
+                  <button
+                    onClick={() => removeContractor(i)}
+                    aria-label={`Видалити ${c.name}`}
+                    title="Видалити контрагента"
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--border)',
+                      borderRadius: 6,
+                      padding: 6,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--text-mute)',
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                <ProgressBar used={c.usedUah} limit={c.limitUah} />
+                <div style={{ marginTop: 5 }}>
+                  <ProgressBar used={c.usedUah} limit={Math.max(1, c.limitUah)} />
+                </div>
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input
+              className="input-row"
+              placeholder="Новий контрагент…"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitNew();
+              }}
+              aria-label="Назва нового контрагента"
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button
+              onClick={submitNew}
+              disabled={!newName.trim()}
+              aria-label="Додати контрагента"
+              style={{
+                background: newName.trim() ? 'var(--finance)' : 'var(--surface-2)',
+                border: 'none',
+                borderRadius: 6,
+                padding: '0 12px',
+                cursor: newName.trim() ? 'pointer' : 'default',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#0E1213',
+              }}
+            >
+              <Plus size={15} />
+            </button>
+          </div>
+
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
             <div
               style={{
                 display: 'flex',
@@ -100,57 +253,18 @@ export function FinancePage() {
               <ComposedChart data={RISK_TREND} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="m" tick={{ fill: 'var(--text-mute)', fontSize: 11 }} axisLine={{ stroke: 'var(--border)' }} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--text-mute)', fontSize: 11 }} axisLine={false} tickLine={false} width={26} />
+                <YAxis tick={{ fill: 'var(--text-mute)', fontSize: 11 }} axisLine={false} tickLine={false} width={26} domain={[0, 100]} />
                 <Tooltip content={<ChartTooltip unit="%" />} />
                 <Area type="monotone" dataKey="score" name="Ризик" stroke="var(--finance)" fill="var(--finance-dim)" strokeWidth={2} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--text-mute)' }}>
-            Поточний скор: {risk.scorePercent}% · {risk.label}
+            Поточний скор: {risk.scorePercent}% · {risk.label} · вікно коригування{' '}
+            {formatDecimalUa(scenario.adjustmentWindowDays, 0)} дн.
           </div>
           <DeadlineList deadlines={deadlines} />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function DeadlineList({
-  deadlines,
-}: {
-  deadlines: ReadonlyArray<{
-    id: string;
-    title: string;
-    dueDateIso: string;
-    daysLeft: number;
-    tone: 'danger' | 'neutral';
-  }>;
-}) {
-  return (
-    <div style={{ marginTop: 10, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-      <Eyebrow>Найближчі дедлайни</Eyebrow>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
-        {deadlines.map((d) => (
-          <div
-            key={d.id}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-          >
-            <div>
-              <div style={{ fontSize: 12.5 }}>{d.title}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-mute)' }}>{d.dueDateIso}</div>
-            </div>
-            <span
-              className="chip f-mono"
-              style={{
-                background: d.tone === 'danger' ? 'var(--danger-dim)' : 'var(--surface-2)',
-                color: d.tone === 'danger' ? 'var(--danger)' : 'var(--text-dim)',
-              }}
-            >
-              {d.daysLeft} дн.
-            </span>
-          </div>
-        ))}
       </div>
     </div>
   );
