@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_BASE } from './client';
 
 interface Props {
   onAuthenticated(email: string): void;
@@ -13,7 +14,7 @@ export function LoginForm({ onAuthenticated }: Props) {
     if (!email.trim() || busy) return;
     setBusy(true); setError(null);
     try {
-      const res = await fetch('/v1/auth/token', {
+      const res = await fetch(`${API_BASE}/v1/auth/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),

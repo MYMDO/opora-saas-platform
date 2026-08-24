@@ -11,6 +11,8 @@ export interface Env {
   CONNECTIONS?: string;
   /** Захист POST /v1/automation/drain */
   DRAIN_KEY?: string;
+  /** Секрет для HMAC-підпису токенів */
+  AUTH_SECRET?: string;
 }
 
 function buildParts(env: Env) {
@@ -21,6 +23,7 @@ function buildParts(env: Env) {
     data: new D1DataPort(env.DB),
     outbox: new D1OutboxDrainPort(env.DB),
     runs: new D1WorkflowRunsPort(env.DB),
+    authSecret: env.AUTH_SECRET,
     webhookPost: async (url: string, body: unknown) => {
       try {
         const res = await fetch(url, {
@@ -50,6 +53,7 @@ export default {
     const app = createApp({
       metadata: parts.metadata,
       data: parts.data,
+      authSecret: env.AUTH_SECRET,
       allowedOrigins: env.ALLOWED_ORIGINS,
       automation: {
         outbox: parts.outbox,
