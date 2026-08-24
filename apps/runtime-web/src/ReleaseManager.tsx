@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import { API_BASE } from './client';
 
 interface ReleaseInfo {
   version: number;
@@ -23,7 +24,7 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(`/v1/apps/${appSlug}/releases`);
+      const res = await fetch(`${API_BASE}/v1/apps/${appSlug}/releases`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as { releases: ReleaseInfo[] };
       setReleases(body.releases);
@@ -38,7 +39,7 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
     setError(null); setOkMsg(null);
     try {
       const def = JSON.parse(draftJson);
-      const res = await fetch(`/v1/apps/${appSlug}/releases`, {
+      const res = await fetch(`${API_BASE}/v1/apps/${appSlug}/releases`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(def),
@@ -57,7 +58,7 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
 
   async function publish(version: number) {
     setError(null); setOkMsg(null);
-    const res = await fetch(`/v1/apps/${appSlug}/releases/${version}/publish`, { method: 'POST' });
+    const res = await fetch(`${API_BASE}/v1/apps/${appSlug}/releases/${version}/publish`, { method: 'POST' });
     if (!res.ok) { setError(`Publish failed: HTTP ${res.status}`); return; }
     setOkMsg(`Реліз v${version} опубліковано`);
     await load();

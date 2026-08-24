@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import { API_BASE } from './client';
 
 interface AppMeta {
   slug: string;
@@ -21,7 +22,7 @@ export function BuilderList({ onOpenApp }: { onOpenApp(slug: string): void }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/v1/apps');
+      const res = await fetch(`${API_BASE}/v1/apps`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as { apps: AppMeta[] };
       setApps(body.apps);
@@ -34,7 +35,7 @@ export function BuilderList({ onOpenApp }: { onOpenApp(slug: string): void }) {
 
   async function create() {
     setError(null);
-    const res = await fetch('/v1/apps', {
+    const res = await fetch(`${API_BASE}/v1/apps`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug, name }),
