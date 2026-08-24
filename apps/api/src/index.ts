@@ -97,7 +97,7 @@ function mapDataError(c: CtxLike, e: unknown): Response {
 function parseFilters(query: URLSearchParams): Record<string, string> {
   const filters: Record<string, string> = {};
   for (const [k, v] of query.entries()) {
-    if (k !== 'limit') filters[k] = v;
+    if (k !== 'limit' && k !== '_offset' && k !== '_limit') filters[k] = v;
   }
   return filters;
 }
@@ -301,6 +301,7 @@ export function createApp(deps: ApiDeps) {
     const page = await deps.data.list(dataCtx(c), def, {
       filters,
       limit: Math.min(Math.max(limitRaw, 1), LIMIT_MAX),
+      offset: Math.max(Number(url.searchParams.get('_offset')) || 0, 0),
     });
     return c.json({
       records: page.rows,

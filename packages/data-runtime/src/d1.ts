@@ -114,10 +114,16 @@ export function buildListQuery(
     where.push(`json_extract(data, '$.${key}') = ?${n}`);
     params.push(value);
   }
-  const limit = Math.min(Math.max(q?.limit ?? 100, 1), 100);
+  const limit = Math.min(Math.max(q?.limit ?? 100, 1), 500);
+  const offset = Math.max(q?.offset ?? 0, 0);
+  const sortField = FIELD_KEY_RE.test(q?.sortBy ?? '') ? `$.${q?.sortBy}` : null;
+  const order = sortField
+    ? `ORDER BY json_extract(data, '${sortField}') ${q?.sortDir === 'desc' ? 'DESC' : 'ASC'}`
+    : 'ORDER BY updated_at DESC';
+  params.push(limit, offset);
   return {
-    sql: `SELECT ${RECORD_COLS} FROM records WHERE ${where.join(' AND ')} ORDER BY updated_at DESC LIMIT ${limit}`,
-    params,
+    sql: `SELECT ${RECORD_COLS} FROM records WHERE ${where.join(' AND ')} ${order} LIMIT ?${n + 1} OFFSET ?${n + 2}`,
+    params: [...params],
   };
 }
 

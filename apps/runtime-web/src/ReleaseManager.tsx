@@ -19,6 +19,19 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
   const [releases, setReleases] = useState<ReleaseInfo[] | null>(null);
   const [draftJson, setDraftJson] = useState('');
   const [visualDraft, setVisualDraft] = useState<DefinitionDraft | null>(null);
+
+  // Завантажити published schema при mount для ініціалізації редактора
+  useEffect(() => {
+    fetch(`/v1/apps/${appSlug}/schema`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data?.definition) return;
+        const def = data.definition as DefinitionDraft;
+        setVisualDraft(structuredClone(def));
+        if (!draftJson) setDraftJson(JSON.stringify(def, null, 2));
+      })
+      .catch(() => {});
+  }, [appSlug]);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
 

@@ -20,6 +20,9 @@ export interface QuerySpec {
   /** Фільтри рівності по полях data (пізніше — оператори) */
   filters?: Record<string, Json>;
   limit?: number;
+  offset?: number;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface Page<R = RecordEntity> {

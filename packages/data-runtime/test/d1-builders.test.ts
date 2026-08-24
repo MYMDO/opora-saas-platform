@@ -42,7 +42,7 @@ describe('SQL builders', () => {
     expect(s.params[2]).toBe('r-1');
   });
 
-  it('list додає equality-фільтри через json_extract з нумерованими плейсхолдерами', () => {
+  it('list додає equality-фільтри через json_extract', () => {
     const s = buildListQuery(
       { tenantId: 't1', appSlug: 'sd', actorId: null },
       'ticket',
@@ -50,8 +50,22 @@ describe('SQL builders', () => {
     );
     expect(s.sql).toContain("json_extract(data, '$.status') = ?4");
     expect(s.sql).toContain("json_extract(data, '$.priority') = ?5");
-    expect(s.sql).toMatch(/LIMIT 10$/);
-    expect(s.params).toEqual(['t1', 'sd', 'ticket', 'new', 'high']);
+    expect(s.sql).toContain('LIMIT ?6');
+    expect(s.sql).toContain('OFFSET ?7');
+    // params: tenant, slug, entity, status, priority, limit=10, offset=0
+    expect(s.params.slice(0, 5)).toEqual(['t1', 'sd', 'ticket', 'new', 'high']);
+    expect(s.params[5]).toBe(10);
+    expect(s.params[6]).toBe(0);
+  });
+
+  it('сортування за полем JSON', () => {
+    const s = buildListQuery(
+      { tenantId: 't1', appSlug: 'sd', actorId: null },
+      'ticket',
+      { sortBy: 'title', sortDir: 'asc', limit: 50 },
+    );
+    expect(s.sql).toContain("json_extract(data, '$.title')");
+    expect(s.sql).not.toContain('DESC');
   });
 
   it('ігнорує фільтри з небезпечними ключами', () => {

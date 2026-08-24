@@ -55,7 +55,7 @@ export class MemoryDataPort implements DataPort {
     entity: EntityDefinition,
     q?: QuerySpec,
   ): Promise<Page> {
-    const rows = applyFilters(
+    let rows = applyFilters(
       this.state.records.filter(
         (r) =>
           !r.deletedAt &&
@@ -64,7 +64,20 @@ export class MemoryDataPort implements DataPort {
           r.entity === entity.apiName,
       ),
       q,
-    ).slice(0, q?.limit ?? 100);
+    );
+    if (q?.sortBy) {
+      const dir = q.sortDir === 'desc' ? -1 : 1;
+      rows.sort((a, b) => {
+        const av = a.data[q.sortBy!] ?? '';
+        const bv = b.data[q.sortBy!] ?? '';
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+      });
+    }
+    const offset = q?.offset ?? 0;
+    const limit = q?.limit ?? 100;
+    rows = rows.slice(offset, offset + limit);
     return { rows: structuredClone(rows) };
   }
 
