@@ -16,7 +16,8 @@
     "@opora/dsl": "workspace:^",
     "@opora/data-runtime": "workspace:^",
     "@opora/metadata": "workspace:^",
-    "hono": "^4.6.0"
+    "hono": "^4.6.0",
+    "@opora/workflow": "workspace:^"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

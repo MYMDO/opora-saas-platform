@@ -22,6 +22,7 @@ export interface AuditEvent {
 export interface OutboxEvent {
   id: string;
   tenantId: string;
+  appSlug: string;
   eventType: string;
   payload: Record<string, Json>;
   createdAt: string;

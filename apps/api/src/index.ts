@@ -4,11 +4,23 @@ import type { MetadataPort } from '@opora/metadata';
 import type { DataPort } from '@opora/data-runtime';
 import { RecordNotFoundError, ValidationError } from '@opora/data-runtime';
 
+import { AutomationService } from './automation';
+import type { OutboxDrainPort, WorkflowRunsPort } from './runs';
+
 export interface ApiDeps {
   metadata: MetadataPort;
   data: DataPort;
   /** Кома-розділений allow-list Origin для CORS */
   allowedOrigins?: string;
+  /** Наявність цих портів увімкнює /v1/automation/drain та /v1/workflow-runs */
+  automation?: {
+    outbox: OutboxDrainPort;
+    runs: WorkflowRunsPort;
+    resolveConnection(connection: string): string | null;
+    webhookPost(url: string, body: unknown): Promise<{ ok: boolean; status?: number; error?: string }>;
+  };
+  /** Ключ захисту drain-endpoint; обовʼязковий у prod */
+  drainKey?: string;
 }
 
 type Env = {
@@ -141,6 +153,29 @@ export function createApp(deps: ApiDeps) {
     const active = await deps.metadata.getActive(slug);
     if (!active) return c.json({ error: 'Активний реліз відсутній' }, 404);
     return c.json({ version: active.version, definition: active.definition });
+  });
+
+  app.get('/v1/workflow-runs', async (c) => {
+    if (!deps.automation) return c.json({ error: 'автоматизації не налаштовані' }, 501);
+    const limit = Number(c.req.query('limit')) || 50;
+    return c.json({ runs: await deps.automation.runs.list(limit) });
+  });
+
+  app.post('/v1/automation/drain', async (c) => {
+    if (!deps.automation) return c.json({ error: 'автоматизації не налаштовані' }, 501);
+    if (deps.drainKey && c.req.header('X-Drain-Key') !== deps.drainKey) {
+      return c.json({ error: 'невірний ключ дрену' }, 401);
+    }
+    const service = new AutomationService({
+      metadata: deps.metadata,
+      data: deps.data,
+      outbox: deps.automation.outbox,
+      runs: deps.automation.runs,
+      resolveConnection: deps.automation.resolveConnection,
+      webhookPost: deps.automation.webhookPost,
+      log: (line) => console.log('[drain]', line),
+    });
+    return c.json(await service.drain());
   });
 
   /* ------------------------------ data runtime ---------------------------- */

@@ -82,13 +82,16 @@ describe('SQL builders', () => {
       after: { title: 'T' },
       occurredAt: '2026-08-23T00:00:00.000Z',
     });
+    expect(s.params[0]).toBe('a-1');
     expect(s.params[6]).toBeNull();
+    expect(s.params[7]).toBe('{"title":"T"}');
     expect(s.params[7]).toBe('{"title":"T"}');
   });
 
   it('outbox пише тип події', () => {
     const s = buildOutbox({
       id: 'o-1',
+      appSlug: 'service-desk',
       tenantId: 't1',
       eventType: 'ticket.created',
       payload: { recordId: 'r-1' },

@@ -9,3 +9,6 @@ ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:5174,https://opora-saa
 binding = "DB"
 database_name = "opora-core-db"
 database_id = "3fd4575f-f3aa-4abe-9c1e-7f827de4bcce"
+
+[triggers]
+crons = ["* * * * *"]

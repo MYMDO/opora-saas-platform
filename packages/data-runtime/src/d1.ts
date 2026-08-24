@@ -186,6 +186,7 @@ export class D1DataPort implements DataPort {
     const outbox: OutboxEvent = {
       id: crypto.randomUUID(),
       tenantId: ctx.tenantId,
+      appSlug: ctx.appSlug,
       eventType: `${entity.apiName}.created`,
       payload: { recordId: record.id },
       createdAt: ts,
@@ -248,6 +249,7 @@ export class D1DataPort implements DataPort {
     const outbox: OutboxEvent = {
       id: crypto.randomUUID(),
       tenantId: ctx.tenantId,
+      appSlug: ctx.appSlug,
       eventType: `${entity.apiName}.deleted`,
       payload: { recordId: id },
       createdAt: ts,

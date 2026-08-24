@@ -146,6 +146,7 @@ export class MemoryDataPort implements DataPort {
       this.state.outbox.push({
         id: crypto.randomUUID(),
         tenantId: ctx.tenantId,
+        appSlug: ctx.appSlug,
         eventType: `${resourceType}.${action}d`,
         payload: { recordId: record.id },
         createdAt: ts,
