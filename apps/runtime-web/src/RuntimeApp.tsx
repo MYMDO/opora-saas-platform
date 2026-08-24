@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { client } from './client';
+import { getToken, getEmail, clearToken } from './auth-store';
+import { LoginForm } from './LoginForm';
 import { EntityWorkspace } from './EntityWorkspace';
 import { BuilderList } from './BuilderList';
 import { ReleaseManager } from './ReleaseManager';
@@ -24,6 +26,7 @@ function parseHash(): Route {
 }
 
 export default function RuntimeApp() {
+  const [authenticated, setAuthenticated] = useState<boolean>(() => Boolean(getToken()));
   const [route, setRoute] = useState<Route>(parseHash);
 
   useEffect(() => {
@@ -57,6 +60,12 @@ export default function RuntimeApp() {
     return schema.definition.entities.find((e) => e.apiName === route.entity) ?? null;
   }, [schema, route]);
 
+  if (!authenticated) {
+    return (
+      <LoginForm onAuthenticated={() => setAuthenticated(true)} />
+    );
+  }
+
   return (
     <div className="opora-root" style={{ display: 'flex', minHeight: '100vh' }}>
       <div className="panel hidden-desktop" style={{ width: 220, borderRadius: 0, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
@@ -88,8 +97,18 @@ export default function RuntimeApp() {
           )}
         </nav>
         <div style={{ padding: 14, borderTop: '1px solid var(--border)' }}>
-          <div className="f-mono" style={{ fontSize: 10, color: 'var(--text-mute)' }}>
+          <div className="f-mono" style={{ fontSize: 10, color: 'var(--text-mute)', marginBottom: 6 }}>
             tenant: demo · v{schema?.version ?? '—'}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{getEmail()}</span>
+            <button
+              className="btn btn-ghost"
+              onClick={() => { clearToken(); setAuthenticated(false); }}
+              title="Вийти"
+            >
+              Вийти
+            </button>
           </div>
         </div>
       </div>

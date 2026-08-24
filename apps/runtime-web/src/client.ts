@@ -2,10 +2,17 @@
 
 export const API_BASE: string = ((import.meta.env?.VITE_API_BASE as string | undefined) ?? '').trim();
 
+function authHeaders(): Record<string, string> {
+  try {
+    const token = localStorage.getItem('opora-auth-token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch { return {}; }
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', 'X-Opora-Tenant': resolveTenant(), ...init?.headers },
+    headers: { 'Content-Type': 'application/json', 'X-Opora-Tenant': resolveTenant(), ...authHeaders(), ...init?.headers },
   });
   if (!res.ok) throw new Error(`API ${path} → ${res.status}`);
   if (res.status === 204) return undefined as T;
