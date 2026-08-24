@@ -4,6 +4,7 @@ import { D1MetadataPort } from '@opora/metadata';
 
 export interface Env {
   DB: D1Database;
+  ALLOWED_ORIGINS?: string;
 }
 
 export default {
@@ -11,6 +12,7 @@ export default {
     const app = createApp({
       metadata: new D1MetadataPort(env.DB),
       data: new D1DataPort(env.DB),
+      allowedOrigins: env.ALLOWED_ORIGINS,
     });
     return app.fetch(request);
   },

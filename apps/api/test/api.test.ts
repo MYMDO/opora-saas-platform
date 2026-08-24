@@ -9,9 +9,9 @@ const fixture = JSON.parse(
   readFileSync(join(__dirname, '../../../packages/dsl/fixtures/service-desk.json'), 'utf-8'),
 );
 
-function makeClient() {
-  const data = new MemoryDataPort();
-  const metadata = new MemoryMetadataPort();
+function makeClient(data?: MemoryDataPort, metadata?: MemoryMetadataPort) {
+  data = data ?? new MemoryDataPort();
+  metadata = metadata ?? new MemoryMetadataPort();
   const app = createApp({ metadata, data });
   return {
     request(path: string, init?: RequestInit) {
@@ -161,5 +161,42 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
   it('health відповідає без залежностей', async () => {
     const res = await makeClient().request('/v1/health');
     expect(res.status).toBe(200);
+  });
+});
+
+describe('CORS', () => {
+  it('preflight для дозволеного origin → 204 + заголовки', async () => {
+    const data = new MemoryDataPort();
+    const metadata = new MemoryMetadataPort();
+    const app = createApp({
+      metadata,
+      data,
+      allowedOrigins: 'https://opora-runtime.pages.dev',
+    });
+    const res = await app.fetch(
+      new Request('https://x/v1/apps/service-desk/schema', {
+        method: 'OPTIONS',
+        headers: {
+          Origin: 'https://opora-runtime.pages.dev',
+          'Access-Control-Request-Method': 'GET',
+        },
+      }),
+    );
+    expect(res.status).toBe(204);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://opora-runtime.pages.dev',
+    );
+  });
+
+  it('невідомий origin — без CORS заголовків', async () => {
+    const app = createApp({
+      metadata: new MemoryMetadataPort(),
+      data: new MemoryDataPort(),
+      allowedOrigins: 'https://good.example',
+    });
+    const res = await app.fetch(
+      new Request('https://x/v1/health', { headers: { Origin: 'https://evil.example' } }),
+    );
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
 });

@@ -3,7 +3,7 @@ main = "src/worker.ts"
 compatibility_date = "2026-08-01"
 
 [vars]
-ALLOWED_ORIGINS = "http://localhost:5173,https://opora-saas-platform.pages.dev"
+ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:5174,https://opora-saas-platform.pages.dev,https://opora-runtime.pages.dev"
 
 [[d1_databases]]
 binding = "DB"

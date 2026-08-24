@@ -7,6 +7,8 @@ import { RecordNotFoundError, ValidationError } from '@opora/data-runtime';
 export interface ApiDeps {
   metadata: MetadataPort;
   data: DataPort;
+  /** Кома-розділений allow-list Origin для CORS */
+  allowedOrigins?: string;
 }
 
 type Env = {
@@ -21,8 +23,34 @@ const TENANT_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const SLUG_RE = /^[a-z][a-z0-9-]{1,62}$/;
 
 interface CtxLike {
-  req: { header(n: string): string | undefined };
+  req: {
+    header(n: string): string | undefined;
+    method: string;
+    param(k: string): string | undefined;
+  };
+  header(k: string, v: string): void;
+  body(data: null, status: number): Response;
   json(body: unknown, status?: number): Response;
+}
+
+function corsMiddleware(allowedOrigins: string | undefined) {
+  const list = (allowedOrigins ?? '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  return async (c: CtxLike, next: () => Promise<void>) => {
+    const origin = c.req.header('Origin');
+    if (origin && list.includes(origin)) {
+      c.header('Access-Control-Allow-Origin', origin);
+      c.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
+      c.header('Access-Control-Allow-Headers', 'Content-Type,X-Opora-Tenant');
+      c.header('Vary', 'Origin');
+      c.header('Access-Control-Max-Age', '86400');
+    }
+    if (c.req.method === 'OPTIONS') return c.body(null, 204);
+    await next();
+  };
 }
 
 function resolveTenant(c: CtxLike): string {
@@ -61,6 +89,7 @@ const LIMIT_MAX = 100;
 export function createApp(deps: ApiDeps) {
   const app = new Hono<Env>();
 
+  app.use('/v1/*', corsMiddleware(deps.allowedOrigins));
   app.use('/v1/*', async (c, next) => {
     c.set('tenantId', resolveTenant(c));
     c.header('Cache-Control', 'no-store');
