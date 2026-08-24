@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { API_BASE } from './client';
-import { DefinitionEditor, type DefinitionDraft } from './DefinitionEditor';
+import { DefinitionEditor, buildFullDefinition, type DefinitionDraft } from './DefinitionEditor';
 
 interface ReleaseInfo {
   version: number;
@@ -103,9 +103,12 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
         </div>
         <DefinitionEditor
           draft={visualDraft ?? emptyDraft()}
+          appSlug={appSlug}
+          appName="Service Desk"
           onChange={(next) => {
             setVisualDraft(next);
-            setDraftJson(JSON.stringify(next, null, 2));
+            const full = buildFullDefinition(next, appSlug, "Service Desk");
+            setDraftJson(JSON.stringify(full, null, 2));
           }}
         />
       </div>

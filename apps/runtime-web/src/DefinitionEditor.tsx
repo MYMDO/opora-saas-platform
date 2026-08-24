@@ -74,16 +74,25 @@ function autoPagePath(entityApiName: string): string {
 export function DefinitionEditor({
   draft,
   onChange,
+  appSlug,
+  appName,
 }: {
   draft: DefinitionDraft;
   onChange(next: DefinitionDraft): void;
+  readonly appSlug: string;
+  readonly appName: string;
 }) {
   const [newEntityName, setNewEntityName] = useState('');
   const [newEntityLabel, setNewEntityLabel] = useState('');
   const [activeEntityIdx, setActiveEntityIdx] = useState(0);
 
-  function addEntity() {
-    const apiName = newEntityName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+  function addEntity(): void {
+    void appSlug; void appName;
+    const raw = newEntityName.trim();
+    // Автосанітизація: нижній регістр, пробіли → _, видалити недопустимі символи
+    let apiName = raw.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    // Гарантувати що починається з літери
+    if (apiName && /^[0-9]/.test(apiName)) apiName = 'e_' + apiName;
     if (!apiName || draft.entities.some((e) => e.apiName === apiName)) return;
     const next = structuredClone(draft);
     next.entities.push({
@@ -97,6 +106,9 @@ export function DefinitionEditor({
       entity: apiName,
       view: { kind: 'table', columns: ['title'] },
     });
+    // Оновити app метадані якщо порожні
+    if (!next.app.slug) next.app.slug = appSlug;
+    if (!next.app.name) next.app.name = appName;
     onChange(next);
     setNewEntityName('');
     setNewEntityLabel('');
@@ -211,6 +223,18 @@ export function DefinitionEditor({
       </div>
     </div>
   );
+}
+
+/** Повертає повне AppDefinition з автоматично підставленими app метаданими */
+export function buildFullDefinition(
+  draft: DefinitionDraft,
+  appSlug: string,
+  appName: string,
+): DefinitionDraft {
+  return {
+    ...draft,
+    app: { slug: appSlug, name: appName },
+  };
 }
 
 export { FIELD_TYPES };
