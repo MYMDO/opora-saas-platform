@@ -1,13 +1,13 @@
-import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { API_BASE } from './client';
+import { DefinitionEditor, type DefinitionDraft } from './DefinitionEditor';
 
 interface ReleaseInfo {
   version: number;
   status: string;
   publishedAt: string | null;
 }
-
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   published: { bg: 'var(--finance-dim)', fg: 'var(--finance)' },
@@ -18,6 +18,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 export function ReleaseManager({ appSlug }: { appSlug: string }) {
   const [releases, setReleases] = useState<ReleaseInfo[] | null>(null);
   const [draftJson, setDraftJson] = useState('');
+  const [visualDraft, setVisualDraft] = useState<DefinitionDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
 
@@ -35,7 +36,7 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
 
   useEffect(() => { void load(); }, [load, appSlug]);
 
-  async function saveDraft() {
+  async function createDraftFromJson() {
     setError(null); setOkMsg(null);
     try {
       const def = JSON.parse(draftJson);
@@ -50,6 +51,7 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
         return;
       }
       setOkMsg('Чернетку створено');
+      setDraftJson('');
       await load();
     } catch (e) {
       setError(String(e).slice(0, 160));
@@ -66,52 +68,61 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Релізи */}
       <div className="panel" style={{ padding: 18 }}>
         <Eyebrow>Релізи застосунку «{appSlug}»</Eyebrow>
         {error && <div style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 6 }}>{error}</div>}
         {okMsg && <div style={{ color: 'var(--finance)', fontSize: 12.5, marginTop: 4 }}>{okMsg}</div>}
+        {!releases && <div style={{ padding: 12, color: 'var(--text-mute)' }}>Завантаження…</div>}
         {releases && (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 10 }}>
-            <thead><tr>
-              <Th>Версія</Th><Th>Статус</Th><Th>Опубліковано</Th><th />
-            </tr></thead>
+            <thead><tr><Th>Версія</Th><Th>Статус</Th><Th>Опубліковано</Th><th /></tr></thead>
             <tbody>
               {releases.map((r) => (
                 <tr key={r.version} className="hoverable">
                   <Td>v{r.version}</Td>
                   <Td><StatusChip status={r.status} /></Td>
                   <Td>{r.publishedAt ? new Date(r.publishedAt).toLocaleString('uk-UA') : '—'}</Td>
-                  <Td>
-                    {r.status === 'draft' && (
-                      <button className="btn btn-solid" style={{ fontSize: 11, padding: '3px 10px' }}
-                        onClick={() => void publish(r.version)}>
-                        Publish
-                      </button>
-                    )}
-                  </Td>
+                  <Td>{r.status === 'draft' && (
+                    <button className="btn btn-solid" style={{ fontSize: 11, padding: '3px 10px' }}
+                      onClick={() => void publish(r.version)}>Publish</button>
+                  )}</Td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-        {!releases && <div style={{ padding: 12, color: 'var(--text-mute)' }}>Завантаження…</div>}
       </div>
 
+      {/* Візуальний редактор */}
+      <div className="panel" style={{ padding: 18 }}>
+        <Eyebrow>Візуальний редактор сутностей</Eyebrow>
+        <div style={{ fontSize: 11.5, color: 'var(--text-mute)', marginBottom: 10 }}>
+          Додайте сутності та поля — JSON згенерується автоматично
+        </div>
+        <DefinitionEditor
+          draft={visualDraft ?? emptyDraft()}
+          onChange={(next) => {
+            setVisualDraft(next);
+            setDraftJson(JSON.stringify(next, null, 2));
+          }}
+        />
+      </div>
+
+      {/* JSON редактор */}
       <div className="panel" style={{ padding: 18 }}>
         <Eyebrow>DSL визначення (JSON)</Eyebrow>
-        <div style={{ fontSize: 11.5, color: 'var(--text-mute)', marginBottom: 8 }}>
-          Вставте або відредагуйте AppDefinition і натисніть «Створити чернетку»
-        </div>
         <textarea
           className="input-row f-mono"
           rows={14}
           value={draftJson}
           onChange={(e) => setDraftJson(e.target.value)}
           placeholder='{ "app": { "slug": "...", "name": "..." }, ... }'
-          style={{ fontSize: 12.5, fontFamily: 'IBM Plex Mono, monospace' }}
+          style={{ fontSize: 12.5, fontFamily: 'IBM Plex Mono, monospace', width: '100%' }}
         />
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          <button className="btn btn-solid" onClick={() => void saveDraft()}
+          <button className="btn btn-solid" onClick={() => void createDraftFromJson()}
             disabled={!draftJson.trim()}>
             Створити чернетку
           </button>
@@ -121,10 +132,22 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
   );
 }
 
-function Th({ children }: { children?: ReactNode }) {
-  return <th style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid var(--border)',
-    color: 'var(--text-mute)', fontWeight: 500, fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase' }}>{children}</th>;
+/* ------------------------------ helpers ------------------------------ */
+
+function emptyDraft(): DefinitionDraft {
+  return { app: { slug: '', name: '' }, entities: [], pages: [] };
 }
+
+function Th({ children }: { children?: ReactNode }) {
+  return (
+    <th style={{
+      textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid var(--border)',
+      color: 'var(--text-mute)', fontWeight: 500, fontSize: 11,
+      letterSpacing: '.08em', textTransform: 'uppercase',
+    }}>{children}</th>
+  );
+}
+
 function Td({ children }: { children: ReactNode }) {
   return <td style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>{children}</td>;
 }
@@ -134,8 +157,12 @@ function StatusChip({ status }: { status: string }) {
   return <span className="chip" style={{ background: s.bg, color: s.fg }}>{status}</span>;
 }
 
-
 function Eyebrow({ children }: { children: ReactNode }) {
-  return <div className="f-mono" style={{ fontSize: 10.5, letterSpacing: '.12em',
-    textTransform: 'uppercase', color: 'var(--text-mute)', fontWeight: 600 }}>{children}</div>;
+  return (
+    <div className="f-mono" style={{
+      fontSize: 10.5, letterSpacing: '.12em',
+      textTransform: 'uppercase', color: 'var(--text-mute)',
+      fontWeight: 600,
+    }}>{children}</div>
+  );
 }
