@@ -127,11 +127,11 @@ export class MemoryOutboxDrainPort implements OutboxDrainPort {
 
 /* ----------------------------------- D1 -------------------------------- */
 
-function parsePayload(raw: string): Record<string, import('@opora/data-runtime').Json> {
+function parsePayload(raw: string): Record<string, Json> {
   try {
     const v = JSON.parse(raw) as unknown;
     return typeof v === 'object' && v !== null
-      ? (v as Record<string, import('@opora/data-runtime').Json>)
+      ? (v as Record<string, Json>)
       : {};
   } catch {
     return {};

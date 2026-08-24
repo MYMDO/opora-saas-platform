@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../src';
 import type { ApiDeps } from '../src';
 import { MemoryOutboxDrainPort, MemoryWorkflowRunsPort } from '../src/runs';
+import type { SharedOutboxRow } from '../src/runs';
 import { MemoryDataPort } from '@opora/data-runtime';
 import { MemoryMetadataPort } from '@opora/metadata';
 
@@ -201,7 +202,7 @@ interface Harness {
 }
 
 async function harnessWithWebhookWorkflow(): Promise<Harness> {
-  const sharedOutbox: Array<import('../src/runs').SharedOutboxRow> = [];
+  const sharedOutbox: SharedOutboxRow[] = [];
   const data = new MemoryDataPort({ outbox: sharedOutbox });
   const metadata = new MemoryMetadataPort();
   const outbox = new MemoryOutboxDrainPort(sharedOutbox);

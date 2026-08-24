@@ -6,6 +6,7 @@ import { RecordNotFoundError, ValidationError } from '@opora/data-runtime';
 
 import { AutomationService } from './automation';
 import type { OutboxDrainPort, WorkflowRunsPort } from './runs';
+import { verifyToken } from './auth';
 
 export interface ApiDeps {
   metadata: MetadataPort;
@@ -21,13 +22,17 @@ export interface ApiDeps {
   };
   /** Ключ захисту drain-endpoint; обовʼязковий у prod */
   drainKey?: string;
+  /** Секрет для HMAC-підпису токенів (обовʼязковий для auth) */
+  authSecret?: string;
 }
+
 
 type Env = {
   Variables: {
     tenantId: string;
     entityDef: EntityDefinition;
     releaseVersion: number;
+    actorId: string | null;
   };
 };
 
@@ -103,12 +108,50 @@ export function createApp(deps: ApiDeps) {
 
   app.use('/v1/*', corsMiddleware(deps.allowedOrigins));
   app.use('/v1/*', async (c, next) => {
+    const authHeader = c.req.header('Authorization');
+    if (authHeader?.startsWith('Bearer ') && deps.authSecret) {
+      const payload = await verifyToken(authHeader.slice(7), deps.authSecret);
+      if (payload) {
+        c.set('tenantId', payload.tenantSlug);
+        c.set('actorId', payload.userId);
+        await next();
+        return;
+      }
+    }
     c.set('tenantId', resolveTenant(c));
+    c.set('actorId', null);
     c.header('Cache-Control', 'no-store');
     await next();
   });
 
   app.get('/v1/health', (c) => c.json({ ok: true, service: 'opora-api' }));
+
+  /* --------------------------------- auth ---------------------------------- */
+
+  app.post('/v1/auth/token', async (c) => {
+    const authSecret = deps.authSecret;
+    if (!authSecret) return c.json({ error: 'auth не налаштовано' }, 501);
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== 'object') return c.json({ error: 'очікується JSON' }, 400);
+    const { email, tenantSlug } = body as Record<string, string>;
+    if (!email || !/^[^@]+@[^@]+$/.test(email)) return c.json({ error: 'некоректний email' }, 400);
+
+    const slug = tenantSlug && SLUG_RE.test(tenantSlug) ? tenantSlug : 'demo';
+    const userId = `usr-${email.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`;
+
+    const token = await import('./auth').then((m) =>
+      m.signToken({ userId, email, tenantSlug: slug, role: 'owner' }, authSecret),
+    );
+    return c.json({ token, userId, tenantSlug: slug }, 201);
+  });
+
+  app.get('/v1/me', async (c) => {
+    if (!c.get('actorId')) return c.json({ error: 'не автентифіковано' }, 401);
+    return c.json({
+      actorId: c.get('actorId'),
+      tenantId: c.get('tenantId'),
+    });
+  });
 
   app.post('/v1/apps', async (c) => {
     const body = await c.req.json().catch(() => null);
