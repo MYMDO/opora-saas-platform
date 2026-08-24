@@ -33,6 +33,7 @@ type Env = {
     entityDef: EntityDefinition;
     releaseVersion: number;
     actorId: string | null;
+    role: 'owner' | 'admin' | 'member';
   };
 };
 
@@ -114,12 +115,14 @@ export function createApp(deps: ApiDeps) {
       if (payload) {
         c.set('tenantId', payload.tenantSlug);
         c.set('actorId', payload.userId);
+        c.set('role', 'admin');
         await next();
         return;
       }
     }
     c.set('tenantId', resolveTenant(c));
     c.set('actorId', null);
+    c.set('role', 'member');
     c.header('Cache-Control', 'no-store');
     await next();
   });
@@ -238,20 +241,34 @@ export function createApp(deps: ApiDeps) {
     await next();
   });
 
-  function dataCtx(c: { req: { param(k: string): string | undefined }; get(k: 'tenantId'): string }) {
+  function dataCtx(c: { get(k: string): unknown; req: { param(k: string): string | undefined } }): {
+    tenantId: string;
+    appSlug: string;
+    actorId: string | null;
+  } {
     return {
-      tenantId: c.get('tenantId'),
+      tenantId: c.get('tenantId') as string,
       appSlug: c.req.param('appSlug') ?? '',
-      actorId: null,
+      actorId: (c.get('actorId') as string | null) ?? null,
     };
+  }
+
+  function isPrivileged(c: { get(k: string): unknown }): boolean {
+    const role = c.get('role');
+    return role === 'admin' || role === 'owner';
   }
 
   data.get('/', async (c) => {
     const def = c.get('entityDef');
     const url = new URL(c.req.url);
     const limitRaw = Number(url.searchParams.get('limit')) || LIMIT_MAX;
+    const filters = parseFilters(url.searchParams);
+    if (!isPrivileged(c)) {
+      const uid = c.get('actorId');
+      if (uid) filters.owner_id = uid;
+    }
     const page = await deps.data.list(dataCtx(c), def, {
-      filters: parseFilters(url.searchParams),
+      filters,
       limit: Math.min(Math.max(limitRaw, 1), LIMIT_MAX),
     });
     return c.json({
@@ -282,6 +299,15 @@ export function createApp(deps: ApiDeps) {
     const id = c.req.param('id');
     const patch = await c.req.json().catch(() => null);
     if (!id) return c.json({ error: 'немає id' }, 400);
+
+    if (!isPrivileged(c)) {
+      const rec = await deps.data.get(dataCtx(c), c.get('entityDef'), id);
+      if (!rec) return c.json({ error: 'Не знайдено' }, 404);
+      if (rec.ownerId && rec.ownerId !== c.get('actorId')) {
+        return c.json({ error: 'Немає доступу до цього запису' }, 403);
+      }
+    }
+
     try {
       const rec = await deps.data.update(dataCtx(c), c.get('entityDef'), id, patch);
       return c.json({ record: rec });
@@ -293,6 +319,15 @@ export function createApp(deps: ApiDeps) {
   data.delete('/:id', async (c) => {
     const id = c.req.param('id');
     if (!id) return c.json({ error: 'немає id' }, 400);
+
+    if (!isPrivileged(c)) {
+      const rec = await deps.data.get(dataCtx(c), c.get('entityDef'), id);
+      if (!rec) return c.json({ error: 'Не знайдено' }, 404);
+      if (rec.ownerId && rec.ownerId !== c.get('actorId')) {
+        return c.json({ error: 'Немає доступу до цього запису' }, 403);
+      }
+    }
+
     try {
       await deps.data.softDelete(dataCtx(c), c.get('entityDef'), id);
       return c.json({ ok: true });

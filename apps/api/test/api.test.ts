@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { signToken } from '../src/auth';
 import { createApp } from '../src';
 import type { ApiDeps } from '../src';
 import { MemoryOutboxDrainPort, MemoryWorkflowRunsPort } from '../src/runs';
@@ -25,6 +26,7 @@ function makeClient(opts?: {
   data?: MemoryDataPort;
   automation?: ApiDeps['automation'];
   drainKey?: string;
+  authSecret?: string;
 }) {
   const metadata = opts?.metadata ?? new MemoryMetadataPort();
   const data = opts?.data ?? new MemoryDataPort();
@@ -33,6 +35,7 @@ function makeClient(opts?: {
     data,
     automation: opts?.automation,
     drainKey: opts?.drainKey,
+    authSecret: opts?.authSecret,
   });
   return {
     request(path: string, init?: RequestInit): Promise<Response> {
@@ -297,5 +300,81 @@ describe('automation drain', () => {
   it('no-store на /v1/* відповідях', async () => {
     const res = await makeClient().request('/v1/health');
     expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+});
+
+/* ------------------------- record-level access control ------------------------ */
+
+describe('record-level access control', () => {
+  it('owner може редагувати свій запис, інший тенант — ні', async () => {
+    const c = await setupPublishedServiceDesk();
+    
+    // Створюємо запис під acme
+    const created = await c.request(
+      '/v1/apps/service-desk/data/ticket',
+      jsonInit('POST', { title: 'ACME-квиток' }, 'acme'),
+    );
+    expect(created.status).toBe(201);
+    const rec = (await created.json()) as { record: { id: string } };
+
+    // Власник (acme) може патчити
+    const ownPatch = await c.request(
+      `/v1/apps/service-desk/data/ticket/${rec.record.id}`,
+      jsonInit('PATCH', { title: 'Оновлено' }, 'acme'),
+    );
+    expect(ownPatch.status).toBe(200);
+
+    // Інший тенант (demo) отримує 404 на чужому записі
+    const foreignPatch = await c.request(
+      `/v1/apps/service-desk/data/ticket/${rec.record.id}`,
+      jsonInit('PATCH', { title: 'злом' }),
+    );
+    expect(foreignPatch.status).toBe(404);
+  });
+
+  it('list фільтрує записи за тенантом навіть без явного ownerId', async () => {
+    const c = await setupPublishedServiceDesk();
+    
+    await c.request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'Demo-квиток' }));
+    await c.request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'ACME-квиток' }, 'acme'));
+
+    const demoList = await c.request('/v1/apps/service-desk/data/ticket');
+    const demoBody = (await demoList.json()) as { records: Array<{ data: { title: string } }> };
+    const titles = demoBody.records.map((r) => r.data.title);
+    expect(titles).toContain('Demo-квиток');
+    expect(titles).not.toContain('ACME-квиток');
+
+    const acmeList = await c.request('/v1/apps/service-desk/data/ticket', {
+      headers: { 'X-Opora-Tenant': 'acme' },
+    });
+    const acmeBody = (await acmeList.json()) as { records: Array<{ data: { title: string } }> };
+    expect(acmeBody.records.map((r) => r.data.title)).toContain('ACME-квиток');
+    expect(acmeBody.records.map((r) => r.data.title)).not.toContain('Demo-квиток');
+  });
+
+  it('audit event містить actorId після auth-запиту', async () => {
+    const SECRET = 'secret-key-32-chars-minimum!!';
+    const c = makeClient({ authSecret: SECRET });
+    // Створюємо app
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'sd-audit', name: 'SD Audit' }));
+    await c.request('/v1/apps/sd-audit/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/sd-audit/releases/1/publish', { method: 'POST' });
+
+    // Створюємо запис з Bearer token
+    const token = await signToken({ userId: 'usr-test', email: 'test@x.ua', tenantSlug: 'demo', role: 'admin' }, SECRET);
+    const res = await c.request('/v1/apps/sd-audit/data/ticket', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title: 'Audit test' }),
+    });
+    expect(res.status).toBe(201);
+
+    // Перевіряємо що actorId потрапив у audit
+    const auditEntry = c.data.state.audit.find((a) => a.actorId === 'usr-test');
+    expect(auditEntry).toBeDefined();
+    expect(auditEntry?.action).toBe('create');
   });
 });
