@@ -70,8 +70,8 @@ export default function RuntimeApp() {
               </div>
               {schema.definition.entities.map((e) => (
                 <button key={e.apiName}
-                  className={`nav-item ${route.view === 'runtime' && activeEntity?.apiName === e.apiName ? 'active' : ''}`}
-                  onClick={() => navigate(`#/${activeSlug}/${e.apiName}`)}>
+                  className={`nav-item ${route.view === 'runtime' && route.slug === schema.definition.app.slug && activeEntity?.apiName === e.apiName ? 'active' : ''}`}
+                  onClick={() => navigate(`#/${schema.definition.app.slug}/${e.apiName}`)}>
                   {e.label}
                 </button>
               ))}
