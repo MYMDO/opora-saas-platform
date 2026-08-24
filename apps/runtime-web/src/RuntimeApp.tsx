@@ -4,6 +4,8 @@ import { EntityWorkspace } from './EntityWorkspace';
 import { BuilderList } from './BuilderList';
 import { ReleaseManager } from './ReleaseManager';
 
+const DEFAULT_SLUG = 'service-desk';
+
 type Route =
   | { view: 'runtime'; slug: string; entity: string | null }
   | { view: 'builder'; appSlug: string | null };
@@ -36,7 +38,9 @@ export default function RuntimeApp() {
 
   const [schema, setSchema] = useState<Awaited<ReturnType<typeof client.getSchema>> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const activeSlug = route.view === 'runtime' ? route.slug : null;
+  const activeSlug = route.view === 'runtime'
+    ? route.slug
+    : route.appSlug ?? DEFAULT_SLUG;
 
   useEffect(() => {
     if (!activeSlug) return;
