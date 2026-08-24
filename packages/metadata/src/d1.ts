@@ -116,6 +116,28 @@ export class D1MetadataPort implements MetadataPort {
     return releaseFrom({ ...releaseRow, status: 'published', published_at: ts });
   }
 
+  async listReleases(appSlug: string): Promise<Array<{ version: number; status: string; publishedAt: string | null }>> {
+    const { results } = await this.db
+      .prepare('SELECT version, status, published_at FROM app_releases WHERE app_slug = ?1 ORDER BY version DESC')
+      .bind(appSlug)
+      .all<Record<string, unknown>>();
+    return (results ?? []).map((r) => ({
+      version: Number(r.version),
+      status: String(r.status),
+      publishedAt: r.published_at == null ? null : String(r.published_at),
+    }));
+  }
+
+  async updateDraft(appSlug: string, version: number, definitionInput: unknown): Promise<void> {
+    await this.mustApp(appSlug);
+    const parsedDef = parseAppDefinition(definitionInput);
+    const res = await this.db
+      .prepare("UPDATE app_releases SET definition = ?3 WHERE app_slug = ?1 AND version = ?2 AND status = 'draft'")
+      .bind(appSlug, version, JSON.stringify(parsedDef))
+      .run();
+    void res;
+  }
+
   async getActive(
     appSlug: string,
   ): Promise<{ version: number; definition: AppDefinition } | null> {

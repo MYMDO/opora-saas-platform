@@ -44,6 +44,13 @@ export interface MetadataPort {
   getActive(
     appSlug: string,
   ): Promise<{ version: number; definition: AppDefinition } | null>;
+  listReleases(appSlug: string): Promise<Array<{
+    version: number;
+    status: string;
+    publishedAt: string | null;
+  }>>;
+  /** Оновлює чернетку релізу (тільки статус draft) */
+  updateDraft(appSlug: string, version: number, definitionInput: unknown): Promise<void>;
 }
 
 export type { AppDefinitionIssue };

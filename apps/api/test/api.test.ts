@@ -57,6 +57,26 @@ async function setupPublishedServiceDesk(tenant = 'demo') {
   return c;
 }
 
+async function setupAdminClient() {
+    const SECRET = 'audit-test-secret-32-chars!';
+    const c = makeClient({ authSecret: SECRET });
+    // Публікуємо service-desk щоб були дані для аудиту
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'service-desk', name: 'Service Desk' }));
+    await c.request('/v1/apps/service-desk/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/service-desk/releases/1/publish', { method: 'POST' });
+    // Отримуємо токен
+    const tokenRes = await c.request('/v1/auth/token', jsonInit('POST', { email: 'admin@test.ua' }));
+    const { token } = (await tokenRes.json()) as { token: string };
+  return {
+    c,
+    request(path: string, init?: RequestInit): Promise<Response> {
+      const headers = new Headers(init?.headers);
+      headers.set('Authorization', `Bearer ${token}`);
+      return c.request(path, { ...init, headers: Object.fromEntries(headers) });
+    },
+  };
+}
+
 /* ----------------------- вертикальний зріз Service Desk ----------------------- */
 
 describe('opora-api — вертикальний зріз Service Desk', () => {
@@ -376,5 +396,35 @@ describe('record-level access control', () => {
     const auditEntry = c.data.state.audit.find((a) => a.actorId === 'usr-test');
     expect(auditEntry).toBeDefined();
     expect(auditEntry?.action).toBe('create');
+  });
+});
+
+/* --------------------------------- audit trail -------------------------------- */
+
+describe('audit trail', () => {
+  it('повертає події для адміна, відсортовані від нових', async () => {
+    const { request } = await setupAdminClient();
+    await request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'T1' }));
+    await request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'T2' }));
+
+    const res = await request('/v1/audit?limit=10');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { events: Array<{ action: string; after: { title?: string } }> };
+    expect(body.events.length).toBeGreaterThanOrEqual(2);
+    expect(body.events[0]?.after?.title).toBe('T2');
+  });
+
+  it('фільтрує за дією', async () => {
+    const { request } = await setupAdminClient();
+    await request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'X' }));
+
+    const res = await request('/v1/audit?action=create&limit=10');
+    const body = (await res.json()) as { events: Array<{ action: string }> };
+    expect(body.events.every((e) => e.action === 'create')).toBe(true);
+  });
+
+  it('забороняє доступ без admin/owner ролі', async () => {
+    const res = await makeClient().request('/v1/audit');
+    expect(res.status).toBe(403);
   });
 });

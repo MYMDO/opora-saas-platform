@@ -65,6 +65,23 @@ export class MemoryMetadataPort implements MetadataPort {
     return clone(release);
   }
 
+  async listReleases(appSlug: string): Promise<Array<{ version: number; status: string; publishedAt: string | null }>> {
+    return [...this.releases.values()]
+      .filter((r) => r.appSlug === appSlug)
+      .map((r) => ({ version: r.version, status: r.status, publishedAt: r.publishedAt ?? null }))
+      .sort((a, b) => b.version - a.version);
+  }
+
+  async updateDraft(appSlug: string, version: number, definitionInput: unknown): Promise<void> {
+    const key = `${appSlug}#${version}`;
+    const release = this.releases.get(key);
+    if (!release || release.status !== 'draft') {
+      throw new MetadataError('not_found', `Чернетку v${version} не знайдено`);
+    }
+    const def = parseAppDefinition(definitionInput);
+    release.definition = def;
+  }
+
   async getActive(
     appSlug: string,
   ): Promise<{ version: number; definition: AppDefinition } | null> {

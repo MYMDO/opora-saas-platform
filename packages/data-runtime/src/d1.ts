@@ -230,6 +230,38 @@ export class D1DataPort implements DataPort {
     return { ...stored, data: merged, updatedAt: ts };
   }
 
+  async audit(
+    ctx: DataPortContext,
+    opts?: { limit?: number; action?: string },
+  ): Promise<AuditEvent[]> {
+    const conds = ['tenant_id = ?1'];
+    const params: unknown[] = [ctx.tenantId];
+    if (opts?.action) {
+      params.push(opts.action);
+      conds.push(`action = ?${params.length}`);
+    }
+    const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 200);
+    params.push(limit);
+    const { results } = await this.db
+      .prepare(
+        `SELECT id, tenant_id, actor_id, action, resource_type, resource_id, before, after, occurred_at
+         FROM audit_events WHERE ${conds.join(' AND ')} ORDER BY occurred_at DESC LIMIT ?${params.length}`,
+      )
+      .bind(...params)
+      .all<Record<string, unknown>>();
+    return (results ?? []).map((r) => ({
+      id: String(r.id),
+      tenantId: String(r.tenant_id),
+      actorId: r.actor_id == null ? null : String(r.actor_id),
+      action: String(r.action) as 'create' | 'update' | 'delete',
+      resourceType: String(r.resource_type),
+      resourceId: String(r.resource_id),
+      before: r.before == null ? null : (JSON.parse(String(r.before)) as Record<string, Json>),
+      after: r.after == null ? null : (JSON.parse(String(r.after)) as Record<string, Json>),
+      occurredAt: String(r.occurred_at),
+    }));
+  }
+
   async softDelete(ctx: DataPortContext, entity: EntityDefinition, id: string): Promise<void> {
     const { stored } = await this.mustGet(ctx, entity, id);
     const ts = nowIso();

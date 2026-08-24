@@ -116,6 +116,15 @@ export class MemoryDataPort implements DataPort {
     return structuredClone(existing);
   }
 
+  async audit(
+    ctx: DataPortContext,
+    opts?: { limit?: number; action?: string },
+  ): Promise<AuditEvent[]> {
+    let rows = this.state.audit.filter((a) => a.tenantId === ctx.tenantId);
+    if (opts?.action) rows = rows.filter((a) => a.action === opts.action);
+    return structuredClone(rows.slice(-(opts?.limit ?? 50)).reverse());
+  }
+
   async softDelete(ctx: DataPortContext, entity: EntityDefinition, id: string): Promise<void> {
     const before = structuredClone(await this.get(ctx, entity, id));
     const existing = this.live(ctx, entity, id);

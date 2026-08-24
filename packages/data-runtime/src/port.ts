@@ -47,4 +47,6 @@ export interface DataPort {
     patch: unknown,
   ): Promise<RecordEntity>;
   softDelete(ctx: DataPortContext, entity: EntityDefinition, id: string): Promise<void>;
+  /** Стрічка аудиту для тенанта (admin only на рівні API) */
+  audit(ctx: DataPortContext, opts?: { limit?: number; action?: string }): Promise<AuditEvent[]>;
 }

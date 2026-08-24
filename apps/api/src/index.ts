@@ -193,6 +193,37 @@ export function createApp(deps: ApiDeps) {
     }
   });
 
+  app.get('/v1/apps/:slug/releases', async (c) => {
+    try {
+      return c.json({ releases: await deps.metadata.listReleases(c.req.param('slug')) });
+    } catch (e) {
+      return mapMetaError(c, e);
+    }
+  });
+
+  app.patch('/v1/apps/:slug/releases/:version', async (c) => {
+    const version = Number(c.req.param('version'));
+    const definition = await c.req.json().catch(() => null);
+    if (!Number.isInteger(version)) return c.json({ error: 'некоректна версія' }, 400);
+    try {
+      await deps.metadata.updateDraft(c.req.param('slug'), version, definition);
+      return c.json({ ok: true });
+    } catch (e) {
+      return mapMetaError(c, e);
+    }
+  });
+
+  app.get('/v1/audit', async (c) => {
+    if (!isPrivileged(c)) return c.json({ error: 'потрібна роль admin або owner' }, 403);
+    const limit = Math.min(Number(c.req.query('limit')) || 50, 200);
+    const action = c.req.query('action') || undefined;
+    const events = await deps.data.audit(
+      { tenantId: c.get('tenantId'), appSlug: '', actorId: null },
+      { limit, action },
+    );
+    return c.json({ events });
+  });
+
   app.get('/v1/apps/:slug/schema', async (c) => {
     const slug = c.req.param('slug');
     if (!slug) return c.json({ error: 'немає slug' }, 400);
