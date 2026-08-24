@@ -8,8 +8,10 @@ coverage/
 .dev.vars
 
 .env
-.env.*
+.env.local
+.env.*.local
 !.env.example
+!.env.production
 
 logs/
 *.log
