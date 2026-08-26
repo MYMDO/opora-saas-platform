@@ -113,6 +113,28 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
     expect(c.data.state.outbox[0]?.eventType).toBe('ticket.created');
   });
 
+  it('list сортує за _sort/_dir та пагінує через _offset/_limit', async () => {
+    const c = await setupPublishedServiceDesk();
+    await c.request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'Бета' }));
+    await c.request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'Альфа' }));
+
+    const asc = await c.request('/v1/apps/service-desk/data/ticket?_sort=title&_dir=asc');
+    const ascBody = (await asc.json()) as { records: Array<{ data: { title: string } }> };
+    const titles = ascBody.records.map((r) => r.data.title);
+    expect(titles.indexOf('Альфа')).toBeLessThan(titles.indexOf('Бета'));
+
+    const desc = await c.request('/v1/apps/service-desk/data/ticket?_sort=title&_dir=desc');
+    const descBody = (await desc.json()) as { records: Array<{ data: { title: string } }> };
+    const dTitles = descBody.records.map((r) => r.data.title);
+    expect(dTitles.indexOf('Бета')).toBeLessThan(dTitles.indexOf('Альфа'));
+
+    const paged = await c.request('/v1/apps/service-desk/data/ticket?_offset=1&_limit=1');
+    expect(((await paged.json()) as { records: unknown[] }).records.length).toBe(1);
+
+    const evil = await c.request("/v1/apps/service-desk/data/ticket?_sort=x'); DROP--");
+    expect((await evil.json()) as { records: Array<{ data: { title: string } }> }).toBeDefined();
+  });
+
   it('валідація: невідоме поле та пропущений required дають 400 з issues', async () => {
     const c = await setupPublishedServiceDesk();
 

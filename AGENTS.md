@@ -11,7 +11,9 @@
    DSL, модель метаданих, етапи. Не відступати без ADR.
 2. `docs/specs/platform-spec.md` — **контракти платформи v0.1**: доменна модель,
    DataPort, tenancy/auth фази, API v1, backlog з критеріями приймання.
-3. `docs/architecture/decision-records/` — ухвалені рішення (почитайте 0001 про півот).
+3. `docs/architecture/decision-records/0001-pivot-to-configurable-platform.md` —
+   півот: повний перехід на конфігуровану платформу, гібридний порт даних,
+   монорепо pnpm+turbo.
 4. `docs/research/ПЛАН_ОПОРА...md` — доменні знання колишньої ОПОРИ (КМУ №692/1048,
    тарифи НКРЕКП); стане в нагоді, коли модулі ОПОРИ повернуться як конфгуровані застосунки.
 5. `reference/opora-v1/` — **заморожений референс** попередньої реалізації.
@@ -19,32 +21,69 @@
 
 ## Структура (pnpm workspaces + Turborepo)
 
-- `packages/dsl` — Zod-схеми DSL + `parseAppDefinition`. **Єдиний експорт:**
-  `parseAppDefinition`, типи `AppDefinition*`, клас `AppDefinitionError`.
-  Вирази (`allow`, `if`) тут НЕ виконуються і не парсяться.
-- `packages/data-runtime` — DataPort-контракт (ADR 0001.2): Memory-адаптер (тести/
-  офлайн) + D1-адаптер; валідація записів за EntityDefinition; audit+outbox у кожній
-  мутації. SQL-білдери тестуються окремо від БД.
-- `packages/metadata` — реєстр застосунків і релізів (draft/publish/getActive),
-  DSL-валідація через @opora/dsl з MetadataError('invalid_definition', issues).
-- `apps/api` — Hono runtime API: `/v1/apps` → releases/publish →
-  `/v1/apps/:slug/data/:entity` CRUD лише за PUBLISHED релізом.
-  Deploy: `cd apps/api && npx wrangler deploy` → https://opora-core-api.p4d-b2q.workers.dev
-  (D1 opora-core-db; міграції `npm run db:migrate:remote|--local`).
-- У черзі: `policy` (AST-evaluator), `ui-schema`, `ui-renderer`, `workflow`,
-  `connector-sdk`, `apps/builder-web`, `apps/runtime-web`.
+### Пакети
+
+| Пакет | Роль | Тести |
+|---|---|---|
+| `packages/dsl` | Zod-схеми DSL + `parseAppDefinition`. Вирази (`allow`, `if`) НЕ виконуються. | 25 |
+| `packages/data-runtime` | DataPort-контракт: Memory + D1 адаптери; валідація записів; audit+outbox у мутаціях. SQL-білдери окремо від БД. | 14+ |
+| `packages/metadata` | Реєстр застосунків і релізів (draft/publish/getActive/listReleases/updateDraft). DSL-валідація через @opora/dsl. | 13 |
+| `packages/workflow` | Матчинг workflow за подією, умови (проста рівність v1), executor (webhook/assign). | 12 |
+
+### Застосунки
+
+| Застосунок | Роль | Deploy |
+|---|---|---|
+| `apps/api` | Hono runtime API: `/v1/apps` → releases/publish → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом. Auth: HMAC Bearer tokens. Record-level RBAC. | Workers: https://opora-core-api.p4d-b2q.workers.dev |
+| `apps/runtime-web` | Vite React SPA: generated table/form CRUD UI from published schema + Builder mode (entity editor, release manager). | Pages: https://opora-runtime.pages.dev |
+
+### Заморожено
+
+- `reference/opora-v1/` — стара ОПОРА v1. Читати можна; імпортувати чи розширювати — ні.
 
 ## Команди
 
-- `pnpm install`
-- `pnpm lint` · `pnpm typecheck` · `pnpm test` (turbo пробігає всі пакети)
-- точково: `pnpm --filter @opora/dsl test`
+```bash
+# Монорепо (з кореня)
+pnpm install                          # перший раз
+pnpm lint                             # eslint flat config
+pnpm typecheck                        # turbo run typecheck (всі пакети)
+pnpm test                             # turbo run test (всі пакети)
+pnpm --filter @opora/dsl test         # один пакет
+
+# API deploy (з apps/api/)
+npm run db:migrate:remote             # міграції D1 remote
+npm run db:migrate:local              # міграції D1 local (Miniflare)
+npx wrangler deploy                   # деплой worker
+
+# Runtime-web build+deploy
+VITE_API_BASE=https://opora-core-api.p4d-b2q.workers.dev npm run build
+npx wrangler pages deploy dist --project-name opora-runtime --branch master
+```
+
+CI пробігає lint + typecheck + test для всіх пакетів (`.github/workflows/ci.yml`).
 
 ## Правила
 
-- Межі пакетів за §7 блюпринта: `ui-renderer` не торкається БД;
-  `dsl` не залежить від Next.js/PostgreSQL; `workflow` лише через контракти data-runtime.
-- Кожна зміна даних у майбутньому runtime — з audit event; tenant boundary тестується.
-- Задачі агентам ставити вузько (приклад — §11 блюпринта), з критеріями готовності:
-  код + тести + контракт + оновлений fixture/DSL приклад.
-- Усі продуктові тексти — українською; форматування чисел/дат uk-UA.
+### Межі пакетів (§7 блюпринта)
+
+- `ui-renderer` не торкається БД — отримує лише view model/API.
+- `dsl` не залежить від Next.js/PostgreSQL.
+- `workflow` лише через контракти data-runtime.
+- Кожна зміна даних у DataPort — audit event + outbox event в одній транзакції.
+- Tenant boundary тестується автоматично для кожного endpoint'а.
+
+### Конвенції коду
+
+- Усі продуктові тексти українською; форматування чисел/дат uk-UA.
+- Модуль→колір: AI teal `--ai`, Energy amber `--energy`, Finance green `--finance`.
+- Дати — `formatDateUa()` (dd.mm.yyyy), числа — `formatNumberUa()`.
+- Без коментарів у коді якщо не запитано.
+
+### Gotchas
+
+- `.env.production` в `apps/runtime-web/` містить публічний API URL — комічити (не секрет).
+- `AUTH_SECRET` та `DRAIN_KEY` — Cloudflare secrets (`npx wrangler secret put`).
+- Деякі мережі блокують `*.workers.dev`; фронтенд використовує same-origin Functions
+  або CORS allow-list. Перевіряти що ALLOWED_ORIGINS включає домен фронтенду.
+- `wrangler deploy` треба запускати окремо після push — CI не деплоїть автоматично.

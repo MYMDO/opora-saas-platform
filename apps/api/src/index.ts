@@ -97,7 +97,7 @@ function mapDataError(c: CtxLike, e: unknown): Response {
 function parseFilters(query: URLSearchParams): Record<string, string> {
   const filters: Record<string, string> = {};
   for (const [k, v] of query.entries()) {
-    if (k !== 'limit' && k !== '_offset' && k !== '_limit') filters[k] = v;
+    if (!k.startsWith('_') && k !== 'limit') filters[k] = v;
   }
   return filters;
 }
@@ -293,6 +293,8 @@ export function createApp(deps: ApiDeps) {
     const def = c.get('entityDef');
     const url = new URL(c.req.url);
     const limitRaw = Number(url.searchParams.get('limit')) || LIMIT_MAX;
+    const sortRaw = url.searchParams.get('_sort') ?? '';
+    const sortBy = /^[a-zA-Z][a-zA-Z0-9_]*$/.test(sortRaw) ? sortRaw : undefined;
     const filters = parseFilters(url.searchParams);
     if (!isPrivileged(c)) {
       const uid = c.get('actorId');
@@ -302,6 +304,8 @@ export function createApp(deps: ApiDeps) {
       filters,
       limit: Math.min(Math.max(limitRaw, 1), LIMIT_MAX),
       offset: Math.max(Number(url.searchParams.get('_offset')) || 0, 0),
+      sortBy,
+      sortDir: url.searchParams.get('_dir') === 'desc' ? 'desc' : 'asc',
     });
     return c.json({
       records: page.rows,

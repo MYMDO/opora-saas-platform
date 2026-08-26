@@ -32,6 +32,10 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
   const [draft, setDraft] = useState<Draft>({});
   const [issues, setIssues] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<{ by: string; dir: 'asc' | 'desc' } | null>(null);
+
+  const PAGE_SIZE = 20;
 
   const tablePage = pages.find((p) => p.entity === entity.apiName && p.view.kind === 'table');
   const formPage = pages.find((p) => p.entity === entity.apiName && p.view.kind === 'form');
@@ -42,14 +46,33 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
     [entity, formPage, tablePage],
   );
 
-  async function reload() {
-    setRows(await client.listRecords(schema.definition.app.slug, entity.apiName));
+  async function reload(nextPage = page, nextSort = sort) {
+    setRows(null);
+    setRows(
+      await client.listRecords(schema.definition.app.slug, entity.apiName, {
+        offset: nextPage * PAGE_SIZE,
+        limit: PAGE_SIZE,
+        sortBy: nextSort?.by,
+        sortDir: nextSort?.dir,
+      }),
+    );
   }
 
   useEffect(() => {
-    void reload();
+    setPage(0);
+    void reload(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema.version, entity.apiName]);
+
+  function toggleSort(col: ColumnVM) {
+    const next =
+      sort?.by === col.name
+        ? { by: col.name, dir: sort.dir === 'asc' ? ('desc' as const) : ('asc' as const) }
+        : { by: col.name, dir: 'asc' as const };
+    setSort(next);
+    setPage(0);
+    void reload(0, next);
+  }
 
   function startCreate() {
     setDraftId(null);
@@ -116,7 +139,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
               {entity.label}
             </div>
             <div className="f-mono" style={{ fontSize: 11, color: 'var(--text-mute)' }}>
-              release v{schema.version} · {rows?.length ?? '…'} записів
+              release v{schema.version} · стор. {page + 1} · {rows?.length ?? '…'} на сторінці
             </div>
           </div>
           {!editing && (
@@ -188,18 +211,28 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
               {columns.map((col: ColumnVM) => (
                 <th
                   key={col.name}
+                  onClick={() => toggleSort(col)}
+                  role="button"
                   style={{
                     textAlign: 'left',
                     padding: '10px 12px',
                     borderBottom: '1px solid var(--border)',
-                    color: 'var(--text-mute)',
+                    color: sort?.by === col.name ? 'var(--text)' : 'var(--text-mute)',
                     fontWeight: 500,
                     fontSize: 11,
                     letterSpacing: '.08em',
                     textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {col.label}
+                  {sort?.by === col.name && (
+                    <span style={{ marginLeft: 4, color: 'var(--ai)' }}>
+                      {sort.dir === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
                 </th>
               ))}
               <th style={{ width: 120 }} />
@@ -232,6 +265,38 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
             )}
           </tbody>
         </table>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 6,
+            padding: '10px 12px',
+            borderTop: '1px solid var(--border)',
+          }}
+        >
+          <button
+            className="btn btn-ghost"
+            disabled={page === 0 || busy}
+            onClick={() => {
+              const p = page - 1;
+              setPage(p);
+              void reload(p);
+            }}
+          >
+            ← Назад
+          </button>
+          <button
+            className="btn btn-ghost"
+            disabled={!rows || rows.length < PAGE_SIZE || busy}
+            onClick={() => {
+              const p = page + 1;
+              setPage(p);
+              void reload(p);
+            }}
+          >
+            Далі →
+          </button>
+        </div>
       </div>
     </div>
   );

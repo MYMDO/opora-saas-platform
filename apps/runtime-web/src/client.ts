@@ -66,11 +66,25 @@ export interface RecordRow {
 export const client = {
   getSchema: (slug: string) =>
     req<PublishedSchema>(`/v1/apps/${slug}/schema`),
-  listRecords: (slug: string, entity: string, filters?: Record<string, string>, offset?: number, limit?: number) => {
+  listRecords: (
+    slug: string,
+    entity: string,
+    opts?: {
+      filters?: Record<string, string>;
+      offset?: number;
+      limit?: number;
+      sortBy?: string;
+      sortDir?: 'asc' | 'desc';
+    },
+  ) => {
     const params = new URLSearchParams();
-    if (filters) for (const [k, v] of Object.entries(filters)) params.set(k, v);
-    if (offset !== undefined) params.set('_offset', String(offset));
-    if (limit !== undefined) params.set('_limit', String(limit));
+    if (opts?.filters) for (const [k, v] of Object.entries(opts.filters)) params.set(k, v);
+    if (opts?.offset !== undefined) params.set('_offset', String(opts.offset));
+    if (opts?.limit !== undefined) params.set('_limit', String(opts.limit));
+    if (opts?.sortBy) {
+      params.set('_sort', opts.sortBy);
+      if (opts.sortDir) params.set('_dir', opts.sortDir);
+    }
     const qs = params.toString() ? `?${params}` : '';
     return req<{ records: RecordRow[] }>(
       `/v1/apps/${slug}/data/${entity}${qs}`,
