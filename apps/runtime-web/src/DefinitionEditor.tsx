@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
@@ -12,6 +12,7 @@ export interface FieldDraft {
   required: boolean;
   options?: string[];
   maxLength?: number;
+  target?: string;
 }
 
 export interface EntityDraft {
@@ -41,6 +42,7 @@ const FIELD_TYPES = [
   { value: 'date', label: 'Дата' },
   { value: 'datetime', label: 'Дата і час' },
   { value: 'select', label: 'Список' },
+  { value: 'relation', label: "Зв'язок" },
 ] as const;
 
 const inputStyle: React.CSSProperties = {
@@ -150,6 +152,22 @@ export function DefinitionEditor({
     onChange(next);
   }
 
+  function changeFieldType(entityIdx: number, fieldIdx: number, type: string) {
+    const next = structuredClone(draft);
+    const entity = next.entities[entityIdx];
+    const field = entity?.fields[fieldIdx];
+    if (!entity || !field) return;
+    field.type = type;
+    if (type === 'select' && (field.options ?? []).length === 0) {
+      field.options = ['Варіант 1', 'Варіант 2'];
+    }
+    if (type === 'relation' && !field.target) {
+      field.target = next.entities.find((e) => e.apiName !== entity.apiName)?.apiName
+        ?? entity.apiName;
+    }
+    onChange(next);
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Сутності */}
@@ -171,7 +189,8 @@ export function DefinitionEditor({
               {/* Поля */}
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {entity.fields.map((field, fi) => (
-                  <div key={fi} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 130px auto auto', gap: 6, alignItems: 'center' }}>
+                  <Fragment key={fi}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 130px auto auto', gap: 6, alignItems: 'center' }}>
                     <input className="input-row" value={field.name} placeholder="назва_поля"
                       onChange={(e) => updateField(ei, fi, { name: e.target.value })}
                       style={{ ...inputStyle, fontSize: 12 }} />
@@ -179,7 +198,7 @@ export function DefinitionEditor({
                       onChange={(e) => updateField(ei, fi, { label: e.target.value })}
                       style={{ ...inputStyle, fontSize: 12 }} />
                     <select className="input-row" value={field.type}
-                      onChange={(e) => updateField(ei, fi, { type: e.target.value })}
+                      onChange={(e) => changeFieldType(ei, fi, e.target.value)}
                       style={{ ...inputStyle, fontSize: 12 }}>
                       {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
@@ -192,6 +211,27 @@ export function DefinitionEditor({
                     <button className="btn btn-icon" onClick={() => removeField(ei, fi)}
                       disabled={entity.fields.length <= 1}>✕</button>
                   </div>
+                  {field.type === 'select' && (
+                    <input className="input-row" value={(field.options ?? []).join(', ')}
+                      placeholder="Варіанти через кому"
+                      onChange={(e) => updateField(ei, fi, {
+                        options: e.target.value.split(',').map((o) => o.trim()).filter(Boolean),
+                      })}
+                      style={{ ...inputStyle, fontSize: 12 }} />
+                  )}
+                  {field.type === 'relation' && (
+                    <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      До сутності:
+                      <select className="input-row" value={field.target ?? ''}
+                        onChange={(e) => updateField(ei, fi, { target: e.target.value })}
+                        style={{ ...inputStyle, fontSize: 12 }}>
+                        {draft.entities.map((e) => (
+                          <option key={e.apiName} value={e.apiName}>{e.label || e.apiName}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  </Fragment>
                 ))}
               </div>
 

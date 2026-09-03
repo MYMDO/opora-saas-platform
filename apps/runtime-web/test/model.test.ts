@@ -71,4 +71,10 @@ describe('formatCellValue', () => {
     expect(formatCellValue(undefined, 'datetime')).toBe('—');
     expect(formatCellValue(42, 'number')).toBe('42');
   });
+
+  it('дати українською, биті — як є', () => {
+    expect(formatCellValue('2026-09-03', 'date')).toBe('03.09.2026');
+    expect(formatCellValue('2026-09-03T14:05:00', 'datetime')).toBe('03.09.2026, 14:05');
+    expect(formatCellValue('не дата', 'date')).toBe('не дата');
+  });
 });

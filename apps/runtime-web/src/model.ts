@@ -78,5 +78,13 @@ function toColumn(f: FieldLike): ColumnVM {
 export function formatCellValue(value: unknown, type: string): string {
   if (value === undefined || value === null || value === '') return '—';
   if (type === 'boolean') return value === true ? 'так' : 'ні';
+  if ((type === 'date' || type === 'datetime') && typeof value === 'string') {
+    const d = new Date(type === 'date' && value.length === 10 ? `${value}T00:00:00` : value);
+    if (!Number.isNaN(d.getTime())) {
+      return type === 'date'
+        ? d.toLocaleDateString('uk-UA')
+        : d.toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+  }
   return String(value);
 }

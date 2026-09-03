@@ -106,7 +106,7 @@ export class MemoryDataPort implements DataPort {
       slot.count += 1;
       counts.set(key, slot);
     }
-    return [...counts.values()].sort((a, b) => b.count - a.count);
+    return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 500);
   }
 
   async get(ctx: DataPortContext, entity: EntityDefinition, id: string): Promise<RecordEntity | null> {

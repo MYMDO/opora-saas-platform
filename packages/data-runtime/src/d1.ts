@@ -143,7 +143,7 @@ export function buildAggregateQuery(
   const { where, params } = buildWhere(ctx, entity, filters);
   const expr = `json_extract(data, '$.${groupBy}')`;
   return {
-    sql: `SELECT ${expr} AS v, COUNT(*) AS c FROM records WHERE ${where.join(' AND ')} GROUP BY ${expr} ORDER BY c DESC`,
+    sql: `SELECT ${expr} AS v, COUNT(*) AS c FROM records WHERE ${where.join(' AND ')} GROUP BY ${expr} ORDER BY c DESC LIMIT 500`,
     params,
   };
 }

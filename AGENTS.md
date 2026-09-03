@@ -35,7 +35,7 @@
 | Застосунок | Роль | Deploy |
 |---|---|---|
 | `apps/api` | Hono runtime API: `/v1/apps` → releases/publish → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом. Auth: HMAC Bearer tokens. Record-level RBAC. Stats + connections endpoints. | Workers: https://opora-core-api.p4d-b2q.workers.dev (33 тести) |
-| `apps/runtime-web` | Vite React SPA: generated table/form CRUD UI from published schema + Builder mode (entity editor, release manager). | Pages: https://opora-runtime.pages.dev (6 тестів) |
+| `apps/runtime-web` | Vite React SPA: generated table/form CRUD UI from published schema + Builder mode (entity editor, release manager). | Pages: https://opora-runtime.pages.dev (7 тестів) |
 
 ### Заморожено
 

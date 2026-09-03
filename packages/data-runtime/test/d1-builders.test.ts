@@ -140,6 +140,7 @@ describe('SQL builders', () => {
     expect(s.sql).toContain('GROUP BY');
     expect(s.sql).toContain('COUNT(*)');
     expect(s.sql).toContain("json_extract(data, '$.priority') = ?4");
+    expect(s.sql).toContain('LIMIT 500');
   });
 
   it('aggregate відхиляє небезпечне поле', () => {
