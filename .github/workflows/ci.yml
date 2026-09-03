@@ -19,3 +19,30 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec turbo run lint typecheck test
+
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/master' && secrets.CLOUDFLARE_API_TOKEN != ''
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VITE_API_BASE: https://opora-core-api.p4d-b2q.workers.dev
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npm run db:migrate:remote
+        working-directory: apps/api
+      - run: npx wrangler deploy
+        working-directory: apps/api
+      - run: npm run build
+        working-directory: apps/runtime-web
+      - run: npx wrangler pages deploy dist --project-name opora-runtime --branch master
+        working-directory: apps/runtime-web
