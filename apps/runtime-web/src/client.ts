@@ -133,4 +133,8 @@ export const client = {
   },
   getWorkflowRuns: (limit = 50) =>
     req<{ runs: WorkflowRun[] }>(`/v1/workflow-runs?limit=${limit}`).then((r) => r.runs),
+  getConnections: () =>
+    req<{ connections: Array<{ slug: string; configured: boolean }> }>('/v1/connections').then(
+      (r) => r.connections,
+    ),
 };

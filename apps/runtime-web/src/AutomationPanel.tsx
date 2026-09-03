@@ -38,6 +38,7 @@ function stepText(s: WorkflowStep): string {
 export function AutomationPanel({ appSlug }: { appSlug: string }) {
   const [workflows, setWorkflows] = useState<WorkflowDef[] | null>(null);
   const [runs, setRuns] = useState<WorkflowRun[] | null>(null);
+  const [connections, setConnections] = useState<Record<string, boolean>>({});
   const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
@@ -55,6 +56,10 @@ export function AutomationPanel({ appSlug }: { appSlug: string }) {
         if (e instanceof Error && e.message.includes('403')) setForbidden(true);
         else setRuns([]);
       });
+    client
+      .getConnections()
+      .then((list) => setConnections(Object.fromEntries(list.map((c) => [c.slug, c.configured]))))
+      .catch(() => setConnections({}));
   }, [appSlug]);
 
   return (
@@ -80,6 +85,9 @@ export function AutomationPanel({ appSlug }: { appSlug: string }) {
             {w.steps.map((s, j) => (
               <span key={j} className="f-mono" style={{ fontSize: 11.5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 999, padding: '2px 10px' }}>
                 {j + 1}. {stepText(s)}
+                {s.type === 'webhook' && s.connection && connections[s.connection] === false && (
+                  <span style={{ color: 'var(--danger)', fontWeight: 700 }}> · не підключено</span>
+                )}
               </span>
             ))}
           </div>

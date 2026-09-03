@@ -239,6 +239,26 @@ export function createApp(deps: ApiDeps) {
     return c.json({ runs: await deps.automation.runs.list(c.get('tenantId'), limit) });
   });
 
+  app.get('/v1/connections', async (c) => {
+    if (!deps.automation) return c.json({ error: 'автоматизації не налаштовані' }, 501);
+    if (!isPrivileged(c)) return c.json({ error: 'потрібна роль admin або owner' }, 403);
+    const slugs = new Set<string>();
+    for (const app of await deps.metadata.listApps()) {
+      const active = await deps.metadata.getActive(app.slug).catch(() => null);
+      for (const w of active?.definition.workflows ?? []) {
+        for (const s of w.steps ?? []) {
+          if (s.type === 'webhook' && s.connection) slugs.add(s.connection);
+        }
+      }
+    }
+    return c.json({
+      connections: [...slugs].sort().map((slug) => ({
+        slug,
+        configured: deps.automation!.resolveConnection(slug) !== null,
+      })),
+    });
+  });
+
   app.post('/v1/automation/drain', async (c) => {
     if (!deps.automation) return c.json({ error: 'автоматизації не налаштовані' }, 501);
     if (deps.drainKey && c.req.header('X-Drain-Key') !== deps.drainKey) {

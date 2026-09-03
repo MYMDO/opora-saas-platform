@@ -396,6 +396,37 @@ describe('automation drain', () => {
     expect(await h.runs.list('other', 10)).toHaveLength(0);
   });
 
+  it('connections: видно налаштованість без розкриття URL', async () => {
+    const SECRET = 'conn-test-secret-32-chars!!!!!!';
+    const c = makeClient({
+      authSecret: SECRET,
+      automation: {
+        outbox: new MemoryOutboxDrainPort(),
+        runs: new MemoryWorkflowRunsPort(),
+        resolveConnection: (slug: string) => (slug === 'test-hook' ? 'https://hooks.test/catch' : null),
+        webhookPost: async () => ({ ok: true, status: 200 }),
+      },
+    });
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'hooked-app', name: 'Hooked App' }));
+    const def = structuredClone(fixture) as { workflows: Array<{ steps: Array<Record<string, unknown>> }> };
+    def.workflows.push({ on: 'ticket.created', steps: [{ type: 'webhook', connection: 'test-hook', event: 'ticket.created' }] });
+    await c.request('/v1/apps/hooked-app/releases', jsonInit('POST', def));
+    await c.request('/v1/apps/hooked-app/releases/1/publish', { method: 'POST' });
+
+    const member = await signToken({ userId: 'u1', email: 'm@x.ua', tenantSlug: 'demo', role: 'member' }, SECRET);
+    expect((await c.request('/v1/connections', { headers: { Authorization: `Bearer ${member}` } })).status).toBe(403);
+
+    const admin = await signToken({ userId: 'u2', email: 'a@x.ua', tenantSlug: 'demo', role: 'admin' }, SECRET);
+    const res = await c.request('/v1/connections', { headers: { Authorization: `Bearer ${admin}` } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { connections: Array<{ slug: string; configured: boolean }> };
+    expect(body.connections).toEqual([
+      { slug: 'slack-internal', configured: false },
+      { slug: 'test-hook', configured: true },
+    ]);
+    expect(JSON.stringify(body)).not.toContain('hooks.test');
+  });
+
   it('no-store на /v1/* відповідях', async () => {
     const res = await makeClient().request('/v1/health');
     expect(res.headers.get('Cache-Control')).toBe('no-store');

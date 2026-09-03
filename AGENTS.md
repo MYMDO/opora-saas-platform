@@ -101,3 +101,9 @@ CI: `verify` (lint+typecheck+test) → `preflight` → `deploy` на master
 - Дрейф спеки: `platform-spec.md` малює App всередині тенанта, реально `apps` глобальні
   (ізоляція — на рівні records/audit/runs). users/memberships таблиці є, логін видає owner.
 - Неавторизовані читання ізольовані лише `X-Opora-Tenant`-заголовком (демо-трейдоф).
+- CORS: кожен заголовок, який шле фронт (сьогодні `Authorization`), мусить бути
+  в `Access-Control-Allow-Headers` api-middleware. Інакше браузер ріже запити
+  з `NetworkError`, а preflight лишається зеленим — оманливо. Є регресійний тест.
+- Webhook-доставка в проді — через `CONNECTIONS` env (JSON slug→URL, краще як
+  wrangler secret). Без нього steps skip'аються (`connection_not_configured`);
+  статус видно в Builder → Автоматизації (`GET /v1/connections` без URL).
