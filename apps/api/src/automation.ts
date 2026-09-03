@@ -157,7 +157,8 @@ export class AutomationService {
         });
 
         const failedStep = result.steps.find((s) => s.status === 'error');
-        const runStatus = result.ok ? 'ok' : 'error';
+        const allSkipped = result.steps.length > 0 && result.steps.every((s) => s.status === 'skipped');
+        const runStatus = result.ok ? (allSkipped ? 'skipped' : 'ok') : 'error';
         await this.deps.runs.finish(idempotencyKey, runStatus, failedStep?.detail);
         await this.safeMark(
           event.id,

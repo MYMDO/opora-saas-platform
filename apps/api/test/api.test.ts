@@ -330,9 +330,9 @@ describe('automation drain', () => {
     expect((h.posts[0]?.body as { event?: string }).event).toBe('ticket.created');
 
     const runs = await h.runs.list('demo', 10);
-    // Обидва workflow виконано: slack-internal (skipped webhook) + test-hook (posted)
+    // test-hook (posted) → ok; slack-internal (немає конекшена) → skipped
     expect(runs).toHaveLength(2);
-    expect(runs.every((r) => r.status === 'ok')).toBe(true);
+    expect(runs.map((r) => r.status).sort()).toEqual(['ok', 'skipped']);
     expect(runs.map((r) => r.workflowOn)).toEqual(['ticket.created', 'ticket.created']);
   });
 
@@ -343,6 +343,33 @@ describe('automation drain', () => {
     const afterFirst = h.posts.length;
     await h.drain();
     expect(h.posts.length).toBe(afterFirst);
+  });
+
+  it('condition_false записується як skipped, а не ok', async () => {
+    const shared: SharedOutboxRow[] = [];
+    const runs = new MemoryWorkflowRunsPort();
+    const c = makeClient({
+      data: new MemoryDataPort({ outbox: shared }),
+      automation: {
+        outbox: new MemoryOutboxDrainPort(shared),
+        runs,
+        resolveConnection: () => 'https://hooks.test/catch',
+        webhookPost: async () => ({ ok: true, status: 200 }),
+      },
+      drainKey: 'secret-key',
+    });
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'cond-app', name: 'Cond' }));
+    const def = structuredClone(fixture) as { workflows: unknown[] };
+    def.workflows = [{
+      on: 'ticket.created',
+      if: "record.title == 'zzz-no-match'",
+      steps: [{ type: 'webhook', connection: 'test-hook', event: 'ticket.created' }],
+    }];
+    await c.request('/v1/apps/cond-app/releases', jsonInit('POST', def));
+    await c.request('/v1/apps/cond-app/releases/1/publish', { method: 'POST' });
+    await c.request('/v1/apps/cond-app/data/ticket', jsonInit('POST', { title: 'Звичайна заявка' }));
+    await c.request('/v1/automation/drain', { method: 'POST', headers: { 'X-Drain-Key': 'secret-key' } });
+    expect(await runs.list('demo', 10)).toEqual([expect.objectContaining({ status: 'skipped' })]);
   });
 
   it('невірний ключ дрену → 401', async () => {
