@@ -100,7 +100,9 @@ export function buildOutbox(o: OutboxEvent): SqlStatement {
   };
 }
 
-/** Екранування LIKE-патерна: шукаємо буквальний підрядок, не шаблон. */
+/** Екранування LIKE-патерна: шукаємо буквальний підрядок, не шаблон.
+ * Увага: SQLite LIKE згортає регістр лише для ASCII (в D1 нема ICU),
+ * тому кириличний пошук чутливий до регістру; memory-адаптер — ні. */
 export function escapeLike(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }

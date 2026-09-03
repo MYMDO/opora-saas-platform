@@ -107,3 +107,6 @@ CI: `verify` (lint+typecheck+test) → `preflight` → `deploy` на master
 - Webhook-доставка в проді — через `CONNECTIONS` env (JSON slug→URL, краще як
   wrangler secret). Без нього steps skip'аються (`connection_not_configured`);
   статус видно в Builder → Автоматизації (`GET /v1/connections` без URL).
+- Пошук `_q`: D1 LIKE згортає регістр лише для ASCII (нема ICU) — кирилиця
+  case-sensitive; memory-адаптер — insensitive. Повна уніфікація = ICU/
+  нормалізована колонка, відкладено свідомо.
