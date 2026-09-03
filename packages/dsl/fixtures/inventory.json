@@ -1,0 +1,148 @@
+{
+  "app": {
+    "slug": "inventory",
+    "name": "Склад"
+  },
+  "entities": [
+    {
+      "apiName": "product",
+      "label": "Товар",
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "maxLength": 200,
+          "label": "Назва"
+        },
+        {
+          "name": "sku",
+          "type": "text",
+          "maxLength": 50,
+          "label": "Артикул"
+        },
+        {
+          "name": "qty",
+          "type": "number",
+          "label": "Кількість"
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "label": "Ціна"
+        },
+        {
+          "name": "in_stock",
+          "type": "boolean",
+          "default": true,
+          "label": "В наявності"
+        }
+      ]
+    },
+    {
+      "apiName": "movement",
+      "label": "Рух товару",
+      "fields": [
+        {
+          "name": "product",
+          "type": "relation",
+          "label": "Товар",
+          "target": "product"
+        },
+        {
+          "name": "kind",
+          "type": "select",
+          "options": [
+            "in",
+            "out"
+          ],
+          "label": "Тип"
+        },
+        {
+          "name": "qty",
+          "type": "number",
+          "required": true,
+          "label": "Кількість"
+        },
+        {
+          "name": "note",
+          "type": "longtext",
+          "label": "Примітка"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "path": "/products",
+      "label": "Товари",
+      "entity": "product",
+      "view": {
+        "kind": "table",
+        "columns": [
+          "name",
+          "sku",
+          "qty",
+          "price",
+          "in_stock"
+        ]
+      }
+    },
+    {
+      "path": "/products/new",
+      "label": "Новий товар",
+      "entity": "product",
+      "view": {
+        "kind": "form",
+        "fields": [
+          "name",
+          "sku",
+          "qty",
+          "price",
+          "in_stock"
+        ]
+      }
+    },
+    {
+      "path": "/movements",
+      "label": "Рухи",
+      "entity": "movement",
+      "view": {
+        "kind": "table",
+        "columns": [
+          "product",
+          "kind",
+          "qty"
+        ]
+      }
+    },
+    {
+      "path": "/movements/new",
+      "label": "Новий рух",
+      "entity": "movement",
+      "view": {
+        "kind": "form",
+        "fields": [
+          "product",
+          "kind",
+          "qty",
+          "note"
+        ]
+      }
+    }
+  ],
+  "policies": [],
+  "workflows": [
+    {
+      "on": "movement.created",
+      "if": "record.kind == 'out'",
+      "steps": [
+        {
+          "type": "webhook",
+          "connection": "ops-hook",
+          "event": "movement.created"
+        }
+      ]
+    }
+  ]
+}
