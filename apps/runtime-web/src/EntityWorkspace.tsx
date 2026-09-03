@@ -30,6 +30,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
   const [rows, setRows] = useState<RecordRow[] | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>({});
+  const [formOpen, setFormOpen] = useState(false);
   const [issues, setIssues] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
@@ -128,12 +129,14 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
       else if (f.type === 'boolean') fresh[f.name] = false;
     }
     setDraft(fresh);
+    setFormOpen(true);
   }
 
   function startEdit(row: RecordRow) {
     setDraftId(row.id);
     setIssues([]);
     setDraft({ ...row.data });
+    setFormOpen(true);
   }
 
   async function save() {
@@ -144,6 +147,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
       else await client.createRecord(schema.definition.app.slug, entity.apiName, draft);
       setDraftId(null);
       setDraft({});
+      setFormOpen(false);
       await reload();
     } catch (e) {
       setIssues([String(e).slice(0, 160)]);
@@ -173,7 +177,12 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
     });
   }
 
-  const editing = draftId !== null || Object.keys(draft).length > 0;
+  function closeForm() {
+    setDraftId(null);
+    setDraft({});
+    setIssues([]);
+    setFormOpen(false);
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -187,7 +196,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
               release v{schema.version} · стор. {page + 1} · {rows?.length ?? '…'} на сторінці
             </div>
           </div>
-          {!editing && (
+          {!formOpen && (
             <button className="btn btn-solid" onClick={startCreate} disabled={busy}>
               + Новий запис
             </button>
@@ -195,7 +204,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
         </div>
       </div>
 
-      {editing && (
+      {formOpen && (
         <div className="panel" style={{ padding: 18 }}>
           <div
             className="f-mono"
@@ -237,11 +246,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
             </button>
             <button
               className="btn btn-surface"
-              onClick={() => {
-                setDraftId(null);
-                setDraft({});
-                setIssues([]);
-              }}
+              onClick={() => closeForm()}
             >
               Скасувати
             </button>
