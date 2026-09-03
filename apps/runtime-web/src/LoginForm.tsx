@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { API_BASE } from './client';
+import { client } from './client';
 
 interface Props {
   onAuthenticated(email: string): void;
@@ -14,17 +14,7 @@ export function LoginForm({ onAuthenticated }: Props) {
     if (!email.trim() || busy) return;
     setBusy(true); setError(null);
     try {
-      const res = await fetch(`${API_BASE}/v1/auth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? `HTTP ${res.status}`);
-        return;
-      }
-      const data = (await res.json()) as { token: string; userId: string };
+      const data = await client.issueToken(email.trim());
       // Імпортуємо динамічно щоб уникнути circular deps
       const { setToken } = await import('./auth-store');
       setToken(data.token, email.trim());

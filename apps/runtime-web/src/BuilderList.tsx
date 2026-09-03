@@ -1,12 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { API_BASE } from './client';
-
-interface AppMeta {
-  slug: string;
-  name: string;
-  activeVersion: number | null;
-}
+import { client, type AppMeta } from './client';
 
 const inputStyle: CSSProperties = {
   padding: '8px 10px',
@@ -14,7 +8,7 @@ const inputStyle: CSSProperties = {
   fontSize: 13,
 };
 
-export function BuilderList({ onOpenApp }: { onOpenApp(slug: string): void }) {
+export function BuilderList({ onManage, onOpenRuntime }: { onManage(slug: string): void; onOpenRuntime(slug: string): void }) {
   const [apps, setApps] = useState<AppMeta[] | null>(null);
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
@@ -22,10 +16,7 @@ export function BuilderList({ onOpenApp }: { onOpenApp(slug: string): void }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/v1/apps`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = (await res.json()) as { apps: AppMeta[] };
-      setApps(body.apps);
+      setApps(await client.listApps());
     } catch (e) {
       setError(String(e).slice(0, 120));
     }
@@ -35,19 +26,14 @@ export function BuilderList({ onOpenApp }: { onOpenApp(slug: string): void }) {
 
   async function create() {
     setError(null);
-    const res = await fetch(`${API_BASE}/v1/apps`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, name }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      setError(body.error ?? `HTTP ${res.status}`);
-      return;
+    try {
+      await client.createApp(slug.trim(), name.trim());
+      setSlug('');
+      setName('');
+      await load();
+    } catch (e) {
+      setError(String(e).slice(0, 160));
     }
-    setSlug('');
-    setName('');
-    await load();
   }
 
   return (
@@ -101,8 +87,12 @@ export function BuilderList({ onOpenApp }: { onOpenApp(slug: string): void }) {
                     <Td>{a.activeVersion != null ? `v${a.activeVersion}` : '—'}</Td>
                     <Td>
                       <button className="btn btn-surface" style={{ fontSize: 11, padding: '3px 8px' }}
-                        onClick={() => onOpenApp(a.slug)}>
-                        Відкрити в Runtime
+                        onClick={() => onOpenRuntime(a.slug)}>
+                        Runtime
+                      </button>{' '}
+                      <button className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}
+                        onClick={() => onManage(a.slug)}>
+                        Керувати
                       </button>
                     </Td>
                   </tr>

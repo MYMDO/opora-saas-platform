@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { API_BASE, client } from './client';
+import { client, type ReleaseMeta } from './client';
 import { DefinitionEditor, buildFullDefinition, type DefinitionDraft } from './DefinitionEditor';
 import { AutomationPanel } from './AutomationPanel';
-
-interface ReleaseInfo {
-  version: number;
-  status: string;
-  publishedAt: string | null;
-}
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   published: { bg: 'var(--finance-dim)', fg: 'var(--finance)' },
@@ -17,7 +11,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 export function ReleaseManager({ appSlug }: { appSlug: string }) {
-  const [releases, setReleases] = useState<ReleaseInfo[] | null>(null);
+  const [releases, setReleases] = useState<ReleaseMeta[] | null>(null);
   const [draftJson, setDraftJson] = useState('');
   const [visualDraft, setVisualDraft] = useState<DefinitionDraft | null>(null);
 
@@ -38,10 +32,7 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/v1/apps/${appSlug}/releases`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = (await res.json()) as { releases: ReleaseInfo[] };
-      setReleases(body.releases);
+      setReleases(await client.listReleases(appSlug));
     } catch (e) {
       setError(String(e).slice(0, 120));
     }
@@ -53,17 +44,8 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
     setError(null); setOkMsg(null);
     try {
       const def = JSON.parse(draftJson);
-      const res = await fetch(`${API_BASE}/v1/apps/${appSlug}/releases`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(def),
-      });
-      if (!res.ok) {
-        const b = (await res.json().catch(() => ({}))) as { error?: string; issues?: Array<{ message: string }> };
-        setError(b.error ?? `HTTP ${res.status}` + (b.issues ? `: ${b.issues.map(i => i.message).join('; ')}` : ''));
-        return;
-      }
-      setOkMsg('Чернетку створено');
+      const release = await client.createDraft(appSlug, def);
+      setOkMsg(`Чернетку v${release.version} створено`);
       setDraftJson('');
       await load();
     } catch (e) {
@@ -73,10 +55,13 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
 
   async function publish(version: number) {
     setError(null); setOkMsg(null);
-    const res = await fetch(`${API_BASE}/v1/apps/${appSlug}/releases/${version}/publish`, { method: 'POST' });
-    if (!res.ok) { setError(`Publish failed: HTTP ${res.status}`); return; }
-    setOkMsg(`Реліз v${version} опубліковано`);
-    await load();
+    try {
+      await client.publishRelease(appSlug, version);
+      setOkMsg(`Реліз v${version} опубліковано`);
+      await load();
+    } catch (e) {
+      setError(String(e).slice(0, 160));
+    }
   }
 
   return (

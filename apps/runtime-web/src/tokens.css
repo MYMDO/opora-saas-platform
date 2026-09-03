@@ -75,3 +75,10 @@ input[type='number'] { appearance: textfield; }
 @media (max-width: 720px) {
   .hidden-desktop { display: none !important; }
 }
+
+.mobile-nav { display: none; }
+
+@media (max-width: 720px) {
+  .mobile-nav { display: block; }
+  .mobile-nav .nav-item { white-space: nowrap; flex-shrink: 0; }
+}

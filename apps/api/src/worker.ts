@@ -30,6 +30,7 @@ function buildParts(env: Env) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal: AbortSignal.timeout(10_000),
         });
         return { ok: res.ok, status: res.status };
       } catch (e) {

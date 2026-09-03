@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { client } from './client';
-import { getToken, getEmail, clearToken } from './auth-store';
+import { getToken, getEmail, clearToken, isTokenExpired } from './auth-store';
 import { LoginForm } from './LoginForm';
 import { EntityWorkspace } from './EntityWorkspace';
 import { AuditPanel } from './AuditPanel';
@@ -29,7 +29,13 @@ function parseHash(): Route {
 }
 
 export default function RuntimeApp() {
-  const [authenticated, setAuthenticated] = useState<boolean>(() => Boolean(getToken()));
+  const [authenticated, setAuthenticated] = useState<boolean>(() => {
+    if (!getToken() || isTokenExpired()) {
+      clearToken();
+      return false;
+    }
+    return true;
+  });
   const [route, setRoute] = useState<Route>(parseHash);
 
   useEffect(() => {
@@ -121,9 +127,31 @@ export default function RuntimeApp() {
       </div>
 
       <main style={{ flex: 1, minWidth: 0, padding: '20px 22px' }}>
+        <div className="mobile-nav panel" style={{ marginBottom: 14, padding: '10px 12px' }}>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', alignItems: 'center' }}>
+            <button className={`nav-item ${route.view === 'builder' ? 'active' : ''}`}
+              onClick={() => navigate('#/builder')}>Builder</button>
+            <button className={`nav-item ${route.view === 'audit' ? 'active' : ''}`}
+              onClick={() => navigate('#/audit')}>Аудит</button>
+            {schema?.definition.entities.map((e) => (
+              <button key={e.apiName}
+                className={`nav-item ${route.view === 'runtime' && activeEntity?.apiName === e.apiName ? 'active' : ''}`}
+                onClick={() => navigate(`#/${schema.definition.app.slug}/${e.apiName}`)}>
+                {e.label}
+              </button>
+            ))}
+            <span style={{ flex: 1 }} />
+            <button className="btn btn-ghost" onClick={() => { clearToken(); setAuthenticated(false); }}>
+              Вийти
+            </button>
+          </div>
+        </div>
         {route.view === 'audit' && <AuditPanel />}
         {route.view === 'builder' && (
-          <BuilderList onOpenApp={(slug: string) => navigate(`#/builder?app=${slug}`)} />
+          <BuilderList
+            onManage={(slug: string) => navigate(`#/builder?app=${slug}`)}
+            onOpenRuntime={(slug: string) => navigate(`#/${slug}`)}
+          />
         )}
         {route.view === 'builder' && route.appSlug && (
           <ReleaseManager appSlug={route.appSlug} />

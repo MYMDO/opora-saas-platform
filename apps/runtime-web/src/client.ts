@@ -14,7 +14,17 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { 'Content-Type': 'application/json', 'X-Opora-Tenant': resolveTenant(), ...authHeaders(), ...init?.headers },
   });
-  if (!res.ok) throw new Error(`API ${path} → ${res.status}`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as {
+      error?: string;
+      issues?: Array<{ message?: string }>;
+    } | null;
+    const detail = body?.issues?.map((i) => i.message).filter(Boolean).join('; ');
+    const message = [body?.error, detail].filter(Boolean).join(': ') || `API ${path} → ${res.status}`;
+    const err = new Error(message) as Error & { status: number };
+    err.status = res.status;
+    throw err;
+  }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -61,6 +71,18 @@ export interface RecordRow {
   data: Record<string, unknown>;
 }
 
+export interface AppMeta {
+  slug: string;
+  name: string;
+  activeVersion: number | null;
+}
+
+export interface ReleaseMeta {
+  version: number;
+  status: string;
+  publishedAt: string | null;
+}
+
 export interface AuditEvent {
   id: string;
   tenantId: string;
@@ -88,6 +110,28 @@ export interface WorkflowRun {
 export const client = {
   getSchema: (slug: string) =>
     req<PublishedSchema>(`/v1/apps/${slug}/schema`),
+  issueToken: (email: string) =>
+    req<{ token: string; userId: string }>(`/v1/auth/token`, {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  listApps: () => req<{ apps: AppMeta[] }>(`/v1/apps`).then((r) => r.apps),
+  createApp: (slug: string, name: string) =>
+    req<{ app: AppMeta }>(`/v1/apps`, {
+      method: 'POST',
+      body: JSON.stringify({ slug, name }),
+    }).then((r) => r.app),
+  listReleases: (slug: string) =>
+    req<{ releases: ReleaseMeta[] }>(`/v1/apps/${slug}/releases`).then((r) => r.releases),
+  createDraft: (slug: string, definition: unknown) =>
+    req<{ release: ReleaseMeta }>(`/v1/apps/${slug}/releases`, {
+      method: 'POST',
+      body: JSON.stringify(definition),
+    }).then((r) => r.release),
+  publishRelease: (slug: string, version: number) =>
+    req<{ release: ReleaseMeta }>(`/v1/apps/${slug}/releases/${version}/publish`, {
+      method: 'POST',
+    }).then((r) => r.release),
   listRecords: (
     slug: string,
     entity: string,

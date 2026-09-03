@@ -24,3 +24,18 @@ export function clearToken(): void {
     localStorage.removeItem(EMAIL_KEY);
   } catch { /* noop */ }
 }
+
+/** Протух або відсутній токен. Перевірка лише для UX-гейту; сервер валідує сам. */
+export function isTokenExpired(): boolean {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const body = token?.split('.')[0];
+    if (!body) return true;
+    const payload = JSON.parse(
+      atob(body.replace(/-/g, '+').replace(/_/g, '/')),
+    ) as { exp?: unknown };
+    return typeof payload.exp !== 'number' || payload.exp < Math.floor(Date.now() / 1000);
+  } catch {
+    return true;
+  }
+}
