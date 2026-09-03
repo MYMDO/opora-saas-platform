@@ -100,21 +100,46 @@ export function buildOutbox(o: OutboxEvent): SqlStatement {
   };
 }
 
-export function buildListQuery(
+export function buildWhere(
   ctx: DataPortContext,
   entity: string,
-  q: QuerySpec | undefined,
-): SqlStatement {
+  filters: Record<string, Json> | undefined,
+): { where: string[]; params: unknown[] } {
   const where = ['tenant_id = ?1', 'app_slug = ?2', 'entity = ?3', 'deleted_at IS NULL'];
   const params: unknown[] = [ctx.tenantId, ctx.appSlug, entity];
   let n = params.length;
-  for (const [key, value] of Object.entries(q?.filters ?? {})) {
+  for (const [key, value] of Object.entries(filters ?? {})) {
     if (!FIELD_KEY_RE.test(key)) continue;
     n += 1;
     if (key === 'owner_id') where.push(`owner_id = ?${n}`);
     else where.push(`json_extract(data, '$.${key}') = ?${n}`);
     params.push(value);
   }
+  return { where, params };
+}
+
+export function buildAggregateQuery(
+  ctx: DataPortContext,
+  entity: string,
+  groupBy: string,
+  filters: Record<string, Json> | undefined,
+): SqlStatement {
+  if (!FIELD_KEY_RE.test(groupBy)) throw new Error(`некоректне поле групування: ${groupBy}`);
+  const { where, params } = buildWhere(ctx, entity, filters);
+  const expr = `json_extract(data, '$.${groupBy}')`;
+  return {
+    sql: `SELECT ${expr} AS v, COUNT(*) AS c FROM records WHERE ${where.join(' AND ')} GROUP BY ${expr} ORDER BY c DESC`,
+    params,
+  };
+}
+
+export function buildListQuery(
+  ctx: DataPortContext,
+  entity: string,
+  q: QuerySpec | undefined,
+): SqlStatement {
+  const { where, params } = buildWhere(ctx, entity, q?.filters);
+  const n = params.length;
   const limit = Math.min(Math.max(q?.limit ?? 100, 1), 500);
   const offset = Math.max(q?.offset ?? 0, 0);
   const sortField = FIELD_KEY_RE.test(q?.sortBy ?? '') ? `$.${q?.sortBy}` : null;
@@ -140,6 +165,23 @@ export class D1DataPort implements DataPort {
   async list(ctx: DataPortContext, entity: EntityDefinition, q?: QuerySpec): Promise<Page> {
     const { results } = await this.prep(buildListQuery(ctx, entity.apiName, q)).all<RecordRow>();
     return { rows: (results ?? []).map((row) => rowToRecord(row, ctx, entity.apiName)) };
+  }
+
+  async aggregate(
+    ctx: DataPortContext,
+    entity: EntityDefinition,
+    opts: { groupBy: string; filters?: Record<string, Json> },
+  ): Promise<Array<{ value: string | number | boolean | null; count: number }>> {
+    const { results } = await this.prep(
+      buildAggregateQuery(ctx, entity.apiName, opts.groupBy, opts.filters),
+    ).all<{ v: unknown; c: number }>();
+    return (results ?? []).map((r) => ({
+      value:
+        r.v === null || r.v === undefined || typeof r.v === 'object'
+          ? null
+          : (r.v as string | number | boolean),
+      count: Number(r.c),
+    }));
   }
 
   async get(ctx: DataPortContext, entity: EntityDefinition, id: string): Promise<RecordEntity | null> {

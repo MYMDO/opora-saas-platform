@@ -37,11 +37,28 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [filterField, setFilterField] = useState('');
   const [filterValue, setFilterValue] = useState('');
+  const [stats, setStats] = useState<Array<{ value: string | number | boolean | null; count: number }> | null>(null);
 
   const PAGE_SIZE = 20;
 
   const tablePage = pages.find((p) => p.entity === entity.apiName && p.view.kind === 'table');
   const formPage = pages.find((p) => p.entity === entity.apiName && p.view.kind === 'form');
+  const statsPage = pages.find((p) => p.entity === entity.apiName && p.view.kind === 'stats');
+
+  const statsGroupBy = statsPage?.view.groupBy ?? null;
+  const statsFieldType = entity.fields.find((f) => f.name === statsGroupBy)?.type ?? 'text';
+
+  useEffect(() => {
+    if (!statsGroupBy) {
+      setStats(null);
+      return;
+    }
+    setStats(null);
+    client
+      .getStats(schema.definition.app.slug, entity.apiName, statsGroupBy)
+      .then(setStats)
+      .catch(() => setStats([]));
+  }, [schema.definition.app.slug, entity.apiName, statsGroupBy]);
 
   const columns = useMemo(() => resolveTableColumns(entity, tablePage), [entity, tablePage]);
   const formFields = useMemo(
@@ -290,6 +307,31 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
           </span>
         ))}
       </div>
+
+      {statsGroupBy && (
+        <div className="panel" style={{ padding: '12px 18px' }}>
+          <div className="f-mono" style={{ fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-mute)', fontWeight: 600, marginBottom: 8 }}>
+            {statsPage?.label ?? 'Статистика'}
+          </div>
+          {(stats ?? []).map((g) => {
+            const max = Math.max(...(stats ?? []).map((x) => x.count), 1);
+            return (
+              <div key={String(g.value)} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <span style={{ width: 140, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {formatCellValue(g.value, statsFieldType)}
+                </span>
+                <div style={{ flex: 1, height: 8, background: 'var(--surface)', borderRadius: 999, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.round((g.count / max) * 100)}%`, height: '100%', background: 'var(--ai)', borderRadius: 999 }} />
+                </div>
+                <span className="f-mono" style={{ width: 40, textAlign: 'right', fontSize: 12 }}>{g.count}</span>
+              </div>
+            );
+          })}
+          {stats?.length === 0 && (
+            <div style={{ fontSize: 12.5, color: 'var(--text-mute)' }}>Немає даних.</div>
+          )}
+        </div>
+      )}
 
       <div className="panel" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>

@@ -100,4 +100,19 @@ describe('MemoryDataPort — tenant boundary та audit/outbox', () => {
       port.update({ ...ctx, tenantId: 'other' }, ticketEntity, rec.id, { priority: 'low' }),
     ).rejects.toThrow(/не знайдено/);
   });
+
+  it('aggregate рахує групи з урахуванням фільтрів і тенанта', async () => {
+    const port = new MemoryDataPort();
+    await port.create(ctx, ticketEntity, { title: 'A', status: 'new' });
+    await port.create(ctx, ticketEntity, { title: 'B', status: 'done' });
+    await port.create(ctx, ticketEntity, { title: 'C', status: 'done' });
+    await port.create({ ...ctx, tenantId: 'other' }, ticketEntity, { title: 'D', status: 'done' });
+    const groups = await port.aggregate(ctx, ticketEntity, { groupBy: 'status' });
+    expect(groups).toEqual([
+      { value: 'done', count: 2 },
+      { value: 'new', count: 1 },
+    ]);
+    const filtered = await port.aggregate(ctx, ticketEntity, { groupBy: 'status', filters: { title: 'A' } });
+    expect(filtered).toEqual([{ value: 'new', count: 1 }]);
+  });
 });

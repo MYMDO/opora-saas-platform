@@ -34,6 +34,11 @@ export interface OutboxEvent {
  */
 export interface DataPort {
   list(ctx: DataPortContext, entity: EntityDefinition, q?: QuerySpec): Promise<Page<RecordEntity>>;
+  aggregate(
+    ctx: DataPortContext,
+    entity: EntityDefinition,
+    opts: { groupBy: string; filters?: Record<string, Json> },
+  ): Promise<Array<{ value: string | number | boolean | null; count: number }>>;
   get(ctx: DataPortContext, entity: EntityDefinition, id: string): Promise<RecordEntity | null>;
   create(
     ctx: DataPortContext,

@@ -86,7 +86,11 @@ export function parseAppDefinition(input: unknown): AppDefinition {
     }
     const fieldNames = new Set(entity.fields.map((f) => f.name));
     const listed =
-      page.view.kind === 'form' ? page.view.fields : page.view.columns;
+      page.view.kind === 'form'
+        ? page.view.fields
+        : page.view.kind === 'stats'
+          ? [page.view.groupBy]
+          : page.view.columns;
     for (const name of listed) {
       if (!fieldNames.has(name)) {
         issues.push({

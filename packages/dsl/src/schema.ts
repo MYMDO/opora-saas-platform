@@ -111,8 +111,9 @@ export type EntityDefinition = z.infer<typeof EntityDefinitionSchema>;
 const TableViewSchema = z.object({ kind: z.literal('table'), columns: z.array(ApiNameSchema).min(1) });
 const DetailViewSchema = z.object({ kind: z.literal('detail'), columns: z.array(ApiNameSchema).min(1) });
 const FormViewSchema = z.object({ kind: z.literal('form'), fields: z.array(ApiNameSchema).min(1) });
+const StatsViewSchema = z.object({ kind: z.literal('stats'), groupBy: ApiNameSchema });
 
-const ViewSchema = z.discriminatedUnion('kind', [TableViewSchema, DetailViewSchema, FormViewSchema]);
+const ViewSchema = z.discriminatedUnion('kind', [TableViewSchema, DetailViewSchema, FormViewSchema, StatsViewSchema]);
 
 export const PageDefinitionSchema = z.object({
   path: z.string().regex(/^\/[a-z0-9-/]*$/, 'шлях починається з «/» і містить [a-z0-9-/]'),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildAggregateQuery,
   buildAudit,
   buildInsertRecord,
   buildListQuery,
@@ -126,5 +127,24 @@ describe('SQL builders', () => {
     expect(s.params[2]).toBe('service-desk');
     expect(s.params[3]).toBe('ticket.created');
     expect(s.params[4]).toBe('{"recordId":"r-1"}');
+  });
+
+  it('aggregate групує через GROUP BY з фільтрами', () => {
+    const s = buildAggregateQuery(
+      { tenantId: 't1', appSlug: 'sd', actorId: null },
+      'ticket',
+      'status',
+      { priority: 'high' },
+    );
+    expect(s.sql).toContain("json_extract(data, '$.status')");
+    expect(s.sql).toContain('GROUP BY');
+    expect(s.sql).toContain('COUNT(*)');
+    expect(s.sql).toContain("json_extract(data, '$.priority') = ?4");
+  });
+
+  it('aggregate відхиляє небезпечне поле', () => {
+    expect(() =>
+      buildAggregateQuery({ tenantId: 't1', appSlug: 'sd', actorId: null }, 'ticket', "x'); DROP--", undefined),
+    ).toThrow();
   });
 });

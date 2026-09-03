@@ -10,6 +10,7 @@ export { validateRecord } from './validate';
 export type { Json, Page, QuerySpec, RecordEntity } from './validate';
 export {
   D1DataPort,
+  buildAggregateQuery,
   buildAudit,
   buildInsertRecord,
   buildListQuery,

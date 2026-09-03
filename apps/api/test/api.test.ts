@@ -150,6 +150,39 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
     expect(bad.status).toBe(400);
   });
 
+  it('stats групує записи з урахуванням прав', async () => {
+    const SECRET = 'stats-test-secret-32-chars!!!!!';
+    const c = makeClient({ authSecret: SECRET });
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'st-app', name: 'ST' }));
+    await c.request('/v1/apps/st-app/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/st-app/releases/1/publish', { method: 'POST' });
+    const tokA = await signToken({ userId: 'usr-a', email: 'a@x.ua', tenantSlug: 'demo', role: 'member' }, SECRET);
+    const tokB = await signToken({ userId: 'usr-b', email: 'b@x.ua', tenantSlug: 'demo', role: 'member' }, SECRET);
+    const post = (token: string, title: string) =>
+      c.request('/v1/apps/st-app/data/ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title }),
+      });
+    await post(tokA, 'A1');
+    await post(tokA, 'A2');
+    await post(tokB, 'B1');
+
+    const resA = await c.request('/v1/apps/st-app/data/ticket/stats?groupBy=status', {
+      headers: { Authorization: `Bearer ${tokA}` },
+    });
+    expect(resA.status).toBe(200);
+    expect((await resA.json()) as { groups: unknown[] }).toEqual({
+      groups: [{ value: 'new', count: 2 }],
+      releaseVersion: 1,
+    });
+
+    const bad = await c.request('/v1/apps/st-app/data/ticket/stats?groupBy=nope', {
+      headers: { Authorization: `Bearer ${tokA}` },
+    });
+    expect(bad.status).toBe(400);
+  });
+
   it('валідація: невідоме поле та пропущений required дають 400 з issues', async () => {
     const c = await setupPublishedServiceDesk();
 

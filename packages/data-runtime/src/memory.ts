@@ -50,21 +50,22 @@ export class MemoryDataPort implements DataPort {
     return row;
   }
 
+  private scoped(ctx: DataPortContext, entity: EntityDefinition): RecordEntity[] {
+    return this.state.records.filter(
+      (r) =>
+        !r.deletedAt &&
+        r.tenantId === ctx.tenantId &&
+        r.appSlug === ctx.appSlug &&
+        r.entity === entity.apiName,
+    );
+  }
+
   async list(
     ctx: DataPortContext,
     entity: EntityDefinition,
     q?: QuerySpec,
   ): Promise<Page> {
-    let rows = applyFilters(
-      this.state.records.filter(
-        (r) =>
-          !r.deletedAt &&
-          r.tenantId === ctx.tenantId &&
-          r.appSlug === ctx.appSlug &&
-          r.entity === entity.apiName,
-      ),
-      q,
-    );
+    let rows = applyFilters(this.scoped(ctx, entity), q);
     if (q?.sortBy) {
       const dir = q.sortDir === 'desc' ? -1 : 1;
       rows.sort((a, b) => {
@@ -79,6 +80,27 @@ export class MemoryDataPort implements DataPort {
     const limit = q?.limit ?? 100;
     rows = rows.slice(offset, offset + limit);
     return { rows: structuredClone(rows) };
+  }
+
+  async aggregate(
+    ctx: DataPortContext,
+    entity: EntityDefinition,
+    opts: { groupBy: string; filters?: Record<string, Json> },
+  ): Promise<Array<{ value: string | number | boolean | null; count: number }>> {
+    const rows = applyFilters(this.scoped(ctx, entity), { filters: opts.filters });
+    const counts = new Map<string, { value: string | number | boolean | null; count: number }>();
+    for (const r of rows) {
+      const raw = r.data[opts.groupBy];
+      const value =
+        raw === undefined || raw === null || typeof raw === 'object'
+          ? null
+          : (raw as string | number | boolean);
+      const key = `${typeof value}:${String(value)}`;
+      const slot = counts.get(key) ?? { value, count: 0 };
+      slot.count += 1;
+      counts.set(key, slot);
+    }
+    return [...counts.values()].sort((a, b) => b.count - a.count);
   }
 
   async get(ctx: DataPortContext, entity: EntityDefinition, id: string): Promise<RecordEntity | null> {

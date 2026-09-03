@@ -268,4 +268,26 @@ describe('policies та workflows', () => {
     const err = expectAppError(d);
     expect(err.issues.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('24. stats-view з groupBy проходить валідацію', () => {
+    const d = base();
+    pages(d).push({
+      path: '/stats',
+      label: 'Статистика',
+      entity: 'ticket',
+      view: { kind: 'stats', groupBy: 'status' },
+    });
+    expect(() => parseAppDefinition(d)).not.toThrow();
+  });
+
+  it('25. stats-view без groupBy відхиляється', () => {
+    const d = base();
+    pages(d).push({
+      path: '/stats',
+      label: 'Статистика',
+      entity: 'ticket',
+      view: { kind: 'stats' },
+    });
+    expectAppError(d);
+  });
 });

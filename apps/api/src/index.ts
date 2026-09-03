@@ -97,7 +97,7 @@ function mapDataError(c: CtxLike, e: unknown): Response {
 function parseFilters(query: URLSearchParams): Record<string, string | number | boolean> {
   const filters: Record<string, string | number | boolean> = {};
   for (const [k, v] of query.entries()) {
-    if (!k.startsWith('_') && k !== 'limit') filters[k] = v;
+    if (!k.startsWith('_') && k !== 'limit' && k !== 'groupBy') filters[k] = v;
   }
   return filters;
 }
@@ -310,13 +310,11 @@ export function createApp(deps: ApiDeps) {
     return role === 'admin' || role === 'owner';
   }
 
-  data.get('/', async (c) => {
-    const def = c.get('entityDef');
-    const url = new URL(c.req.url);
-    const limitRaw = Number(url.searchParams.get('limit') ?? url.searchParams.get('_limit')) || LIMIT_MAX;
-    const sortRaw = url.searchParams.get('_sort') ?? '';
-    const sortBy = /^[a-zA-Z][a-zA-Z0-9_]*$/.test(sortRaw) ? sortRaw : undefined;
-    const filters = parseFilters(url.searchParams);
+  function coerceFilters(
+    c: { json(data: unknown, status?: number): Response },
+    def: { fields: Array<{ name: string; type: string }> },
+    filters: Record<string, string | number | boolean>,
+  ): Response | null {
     const fieldTypes = new Map(def.fields.map((f) => [f.name, f.type]));
     for (const [k, v] of Object.entries(filters)) {
       const t = fieldTypes.get(k);
@@ -329,10 +327,29 @@ export function createApp(deps: ApiDeps) {
         filters[k] = v === 'true';
       }
     }
+    return null;
+  }
+
+  function scopeFilters(
+    c: { get(k: string): unknown },
+    filters: Record<string, string | number | boolean>,
+  ): void {
     if (!isPrivileged(c)) {
       const uid = c.get('actorId');
-      if (uid) filters.owner_id = uid;
+      if (uid) filters.owner_id = String(uid);
     }
+  }
+
+  data.get('/', async (c) => {
+    const def = c.get('entityDef');
+    const url = new URL(c.req.url);
+    const limitRaw = Number(url.searchParams.get('limit') ?? url.searchParams.get('_limit')) || LIMIT_MAX;
+    const sortRaw = url.searchParams.get('_sort') ?? '';
+    const sortBy = /^[a-zA-Z][a-zA-Z0-9_]*$/.test(sortRaw) ? sortRaw : undefined;
+    const filters = parseFilters(url.searchParams);
+    const bad = coerceFilters(c, def, filters);
+    if (bad) return bad;
+    scopeFilters(c, filters);
     const page = await deps.data.list(dataCtx(c), def, {
       filters,
       limit: Math.min(Math.max(limitRaw, 1), LIMIT_MAX),
@@ -344,6 +361,31 @@ export function createApp(deps: ApiDeps) {
       records: page.rows,
       releaseVersion: c.get('releaseVersion'),
     });
+  });
+
+  data.get('/stats', async (c) => {
+    const def = c.get('entityDef');
+    const url = new URL(c.req.url);
+    const groupBy = url.searchParams.get('groupBy') ?? '';
+    const field = def.fields.find((f) => f.name === groupBy);
+    if (!field) return c.json({ error: `невідоме поле групування: ${groupBy || '—'}` }, 400);
+    const filters = parseFilters(url.searchParams);
+    const bad = coerceFilters(c, def, filters);
+    if (bad) return bad;
+    scopeFilters(c, filters);
+    const groups = await deps.data.aggregate(dataCtx(c), def, { groupBy, filters });
+    const normalized = groups.map((g) => ({
+      value:
+        field.type === 'boolean'
+          ? g.value === 1 || g.value === true
+            ? true
+            : g.value === 0 || g.value === false
+              ? false
+              : null
+          : g.value,
+      count: g.count,
+    }));
+    return c.json({ groups: normalized, releaseVersion: c.get('releaseVersion') });
   });
 
   data.post('/', async (c) => {

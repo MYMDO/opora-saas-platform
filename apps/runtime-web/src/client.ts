@@ -44,7 +44,7 @@ export interface PageVM {
   path: string;
   label: string;
   entity: string;
-  view: { kind: string; columns?: string[]; fields?: string[] };
+  view: { kind: string; columns?: string[]; fields?: string[]; groupBy?: string };
 }
 
 export interface PublishedSchema {
@@ -133,6 +133,10 @@ export const client = {
   },
   getWorkflowRuns: (limit = 50) =>
     req<{ runs: WorkflowRun[] }>(`/v1/workflow-runs?limit=${limit}`).then((r) => r.runs),
+  getStats: (slug: string, entity: string, groupBy: string) =>
+    req<{ groups: Array<{ value: string | number | boolean | null; count: number }> }>(
+      `/v1/apps/${slug}/data/${entity}/stats?groupBy=${encodeURIComponent(groupBy)}`,
+    ).then((r) => r.groups),
   getConnections: () =>
     req<{ connections: Array<{ slug: string; configured: boolean }> }>('/v1/connections').then(
       (r) => r.connections,
