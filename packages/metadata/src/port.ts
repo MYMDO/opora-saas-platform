@@ -38,6 +38,10 @@ export class MetadataError extends Error {
 export interface MetadataPort {
   createApp(slug: string, name: string): Promise<AppMeta>;
   listApps(): Promise<AppMeta[]>;
+  /** Видаляє застосунок і всі його релізи (кидає not_found).
+   * Записи даних стають недосяжними (немає active release);
+   * audit/outbox-історія свідомо зберігається. */
+  deleteApp(slug: string): Promise<void>;
   /** Валідує визначення через @opora/dsl; кидає MetadataError('invalid_definition'). */
   createDraft(appSlug: string, definitionInput: unknown): Promise<ReleaseMeta>;
   publish(appSlug: string, version: number): Promise<ReleaseMeta>;

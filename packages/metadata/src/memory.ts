@@ -98,6 +98,14 @@ export class MemoryMetadataPort implements MetadataPort {
     return app;
   }
 
+  async deleteApp(slug: string): Promise<void> {
+    this.mustApp(slug);
+    this.apps.delete(slug);
+    for (const keyStr of [...this.releases.keys()]) {
+      if (keyStr.startsWith(`${slug}#`)) this.releases.delete(keyStr);
+    }
+  }
+
   private nextVersion(slug: string): number {
     let max = 0;
     for (const keyStr of this.releases.keys()) {

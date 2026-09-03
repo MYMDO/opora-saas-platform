@@ -87,6 +87,26 @@ describe('D1MetadataPort', () => {
     expect(active?.version).toBe(2);
     expect(active?.definition.app.slug).toBe('service-desk');
   });
+
+  it('deleteApp перевіряє наявність і чистить релізи одним batch', async () => {
+    const db = new FakeD1([
+      { test: (s) => s.includes('FROM apps WHERE slug'), handle: () => ({ slug: 'sd' }) },
+      { test: (s) => s.startsWith('DELETE FROM app_releases'), handle: () => null },
+      { test: (s) => s.startsWith('DELETE FROM apps'), handle: () => null },
+    ]);
+    await new D1MetadataPort(db as never).deleteApp('sd');
+    expect(db.calls('DELETE FROM app_releases')).toHaveLength(1);
+    expect(db.calls('DELETE FROM apps')).toHaveLength(1);
+  });
+
+  it('deleteApp невідомого застосунку → not_found', async () => {
+    const db = new FakeD1([
+      { test: (s) => s.includes('FROM apps WHERE slug'), handle: () => null },
+    ]);
+    await expect(new D1MetadataPort(db as never).deleteApp('ghost')).rejects.toMatchObject({
+      code: 'not_found',
+    });
+  });
 });
 
 function minimalDef() {

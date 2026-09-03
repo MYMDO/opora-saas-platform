@@ -36,6 +36,17 @@ export function BuilderList({ onManage, onOpenRuntime }: { onManage(slug: string
     }
   }
 
+  async function remove(appSlug: string, appName: string) {
+    if (!window.confirm(`Видалити застосунок «${appName}» і всі його релізи? Дані стануть недосяжними.`)) return;
+    setError(null);
+    try {
+      await client.deleteApp(appSlug);
+      await load();
+    } catch (e) {
+      setError(String(e).slice(0, 160));
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="panel" style={{ padding: 18 }}>
@@ -93,6 +104,10 @@ export function BuilderList({ onManage, onOpenRuntime }: { onManage(slug: string
                       <button className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}
                         onClick={() => onManage(a.slug)}>
                         Керувати
+                      </button>{' '}
+                      <button className="btn btn-icon" title={`Видалити ${a.slug}`}
+                        onClick={() => void remove(a.slug, a.name)}>
+                        ✕
                       </button>
                     </Td>
                   </tr>

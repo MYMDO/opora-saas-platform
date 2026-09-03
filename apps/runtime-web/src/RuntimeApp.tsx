@@ -50,6 +50,7 @@ export default function RuntimeApp() {
 
   const [schema, setSchema] = useState<Awaited<ReturnType<typeof client.getSchema>> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [appKnown, setAppKnown] = useState<boolean | null>(null);
   const activeSlug = route.view === 'runtime'
     ? route.slug
     : route.view === 'builder'
@@ -59,10 +60,17 @@ export default function RuntimeApp() {
   useEffect(() => {
     if (!activeSlug) return;
     let cancelled = false;
-    setError(null); setSchema(null);
+    setError(null); setSchema(null); setAppKnown(null);
     client.getSchema(activeSlug)
       .then((s) => !cancelled && setSchema(s))
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : String(e));
+        client
+          .listApps()
+          .then((apps) => !cancelled && setAppKnown(apps.some((a) => a.slug === activeSlug)))
+          .catch(() => !cancelled && setAppKnown(null));
+      });
     return () => { cancelled = true; };
   }, [activeSlug]);
 
@@ -160,9 +168,29 @@ export default function RuntimeApp() {
         {route.view === 'runtime' && error && (
           <div className="panel" role="alert" style={{ padding: 24 }}>
             <div style={{ color: 'var(--danger)', fontWeight: 600, marginBottom: 4 }}>
-              Не вдалося завантажити схему
+              {appKnown === true
+                ? `У «${route.slug}» немає опублікованого релізу`
+                : appKnown === false
+                  ? `Застосунок «${route.slug}» не знайдено`
+                  : 'Не вдалося завантажити схему'}
             </div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-dim)', marginBottom: 8 }}>{error}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-dim)', marginBottom: 8 }}>
+              {appKnown === true
+                ? 'Створіть чернетку і натисніть Publish у Builder.'
+                : appKnown === false
+                  ? 'Перевірте адресу або створіть його в Builder.'
+                  : error}
+            </div>
+            {appKnown === true && (
+              <button className="btn btn-solid" onClick={() => navigate(`#/builder?app=${route.slug}`)}>
+                Відкрити в Builder
+              </button>
+            )}{' '}
+            {appKnown === false && (
+              <button className="btn btn-solid" onClick={() => navigate('#/builder')}>
+                До списку застосунків
+              </button>
+            )}{' '}
             <button className="btn btn-surface" onClick={() => window.location.reload()}>Спробувати знову</button>
           </div>
         )}

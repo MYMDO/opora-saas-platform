@@ -150,6 +150,37 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
     expect(bad.status).toBe(400);
   });
 
+  it('DELETE /v1/apps/:slug: member → 403, admin чистить застосунок', async () => {
+    const SECRET = 'app-delete-test-secret-32-chars!';
+    const c = makeClient({ authSecret: SECRET });
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'tmp-app', name: 'Tmp' }));
+    await c.request('/v1/apps/tmp-app/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/tmp-app/releases/1/publish', { method: 'POST' });
+    await c.request('/v1/apps/tmp-app/data/ticket', jsonInit('POST', { title: 'T' }));
+
+    const member = await signToken({ userId: 'u1', email: 'm@x.ua', tenantSlug: 'demo', role: 'member' }, SECRET);
+    expect(
+      (await c.request('/v1/apps/tmp-app', { method: 'DELETE', headers: { Authorization: `Bearer ${member}` } })).status,
+    ).toBe(403);
+
+    const admin = await signToken({ userId: 'u2', email: 'a@x.ua', tenantSlug: 'demo', role: 'admin' }, SECRET);
+    const del = await c.request('/v1/apps/tmp-app', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${admin}` },
+    });
+    expect(del.status).toBe(200);
+    expect(((await (await c.request('/v1/apps/tmp-app/releases')).json()) as { releases: unknown[] }).releases).toHaveLength(0);
+    expect((await c.request('/v1/apps/tmp-app/data/ticket')).status).toBe(404);
+    const apps = (
+      (await (await c.request('/v1/apps')).json()) as { apps: Array<{ slug: string }> }
+    ).apps.map((a) => a.slug);
+    expect(apps).not.toContain('tmp-app');
+    expect((await c.request('/v1/apps/tmp-app', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${admin}` },
+    })).status).toBe(404);
+  });
+
   it('stats групує записи з урахуванням прав', async () => {
     const SECRET = 'stats-test-secret-32-chars!!!!!';
     const c = makeClient({ authSecret: SECRET });

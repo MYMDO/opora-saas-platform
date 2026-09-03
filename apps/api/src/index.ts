@@ -171,6 +171,16 @@ export function createApp(deps: ApiDeps) {
 
   app.get('/v1/apps', async (c) => c.json({ apps: await deps.metadata.listApps() }));
 
+  app.delete('/v1/apps/:slug', async (c) => {
+    if (!isPrivileged(c)) return c.json({ error: 'потрібна роль admin або owner' }, 403);
+    try {
+      await deps.metadata.deleteApp(c.req.param('slug'));
+      return c.json({ ok: true });
+    } catch (e) {
+      return mapMetaError(c, e);
+    }
+  });
+
   app.post('/v1/apps/:slug/releases', async (c) => {
     const slug = c.req.param('slug');
     if (!slug) return c.json({ error: 'немає slug' }, 400);

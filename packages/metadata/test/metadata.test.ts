@@ -69,4 +69,14 @@ describe('MemoryMetadataPort', () => {
     await expect(port.createDraft('ghost', fixture)).rejects.toMatchObject({ code: 'not_found' });
     await expect(port.publish('ghost', 9)).rejects.toMatchObject({ code: 'not_found' });
   });
+
+  it('deleteApp прибирає застосунок і релізи; повтор → not_found', async () => {
+    const port = new MemoryMetadataPort();
+    await port.createApp('service-desk', 'Service Desk');
+    await port.createDraft('service-desk', fixture);
+    await port.deleteApp('service-desk');
+    expect(await port.listApps()).toHaveLength(0);
+    await expect(port.createDraft('service-desk', fixture)).rejects.toMatchObject({ code: 'not_found' });
+    await expect(port.deleteApp('service-desk')).rejects.toMatchObject({ code: 'not_found' });
+  });
 });

@@ -121,6 +121,8 @@ export const client = {
       method: 'POST',
       body: JSON.stringify({ slug, name }),
     }).then((r) => r.app),
+  deleteApp: (slug: string) =>
+    req<{ ok: boolean }>(`/v1/apps/${slug}`, { method: 'DELETE' }),
   listReleases: (slug: string) =>
     req<{ releases: ReleaseMeta[] }>(`/v1/apps/${slug}/releases`).then((r) => r.releases),
   createDraft: (slug: string, definition: unknown) =>

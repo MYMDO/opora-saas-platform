@@ -162,5 +162,13 @@ export class D1MetadataPort implements MetadataPort {
     if (!row) throw new MetadataError('not_found', `Застосунок "${slug}" не знайдено`);
     return row;
   }
+
+  async deleteApp(slug: string): Promise<void> {
+    await this.mustApp(slug);
+    await this.db.batch([
+      this.db.prepare('DELETE FROM app_releases WHERE app_slug = ?1').bind(slug),
+      this.db.prepare('DELETE FROM apps WHERE slug = ?1').bind(slug),
+    ]);
+  }
 }
 
