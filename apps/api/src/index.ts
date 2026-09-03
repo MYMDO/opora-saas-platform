@@ -236,7 +236,7 @@ export function createApp(deps: ApiDeps) {
     if (!deps.automation) return c.json({ error: 'автоматизації не налаштовані' }, 501);
     if (!isPrivileged(c)) return c.json({ error: 'потрібна роль admin або owner' }, 403);
     const limit = Number(c.req.query('limit')) || 50;
-    return c.json({ runs: await deps.automation.runs.list(limit) });
+    return c.json({ runs: await deps.automation.runs.list(c.get('tenantId'), limit) });
   });
 
   app.post('/v1/automation/drain', async (c) => {
@@ -293,7 +293,7 @@ export function createApp(deps: ApiDeps) {
   data.get('/', async (c) => {
     const def = c.get('entityDef');
     const url = new URL(c.req.url);
-    const limitRaw = Number(url.searchParams.get('limit')) || LIMIT_MAX;
+    const limitRaw = Number(url.searchParams.get('limit') ?? url.searchParams.get('_limit')) || LIMIT_MAX;
     const sortRaw = url.searchParams.get('_sort') ?? '';
     const sortBy = /^[a-zA-Z][a-zA-Z0-9_]*$/.test(sortRaw) ? sortRaw : undefined;
     const filters = parseFilters(url.searchParams);

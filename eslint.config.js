@@ -6,10 +6,10 @@ export default tseslint.config(
   },
   ...tseslint.configs.recommended.map((config) => ({
     ...config,
-    files: ['packages/**/*.ts', 'apps/**/*.ts'],
+    files: ['packages/**/*.ts', 'apps/**/*.ts', 'apps/**/*.tsx'],
   })),
   {
-    files: ['packages/**/*.ts', 'apps/**/*.ts'],
+    files: ['packages/**/*.ts', 'apps/**/*.ts', 'apps/**/*.tsx'],
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': 'error',

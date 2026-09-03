@@ -111,7 +111,8 @@ export function buildListQuery(
   for (const [key, value] of Object.entries(q?.filters ?? {})) {
     if (!FIELD_KEY_RE.test(key)) continue;
     n += 1;
-    where.push(`json_extract(data, '$.${key}') = ?${n}`);
+    if (key === 'owner_id') where.push(`owner_id = ?${n}`);
+    else where.push(`json_extract(data, '$.${key}') = ?${n}`);
     params.push(value);
   }
   const limit = Math.min(Math.max(q?.limit ?? 100, 1), 500);

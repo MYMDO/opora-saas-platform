@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { API_BASE } from './client';
+import { API_BASE, client } from './client';
 import { DefinitionEditor, buildFullDefinition, type DefinitionDraft } from './DefinitionEditor';
 import { AutomationPanel } from './AutomationPanel';
 
@@ -23,13 +23,12 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
 
   // Завантажити published schema при mount для ініціалізації редактора
   useEffect(() => {
-    fetch(`/v1/apps/${appSlug}/schema`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data?.definition) return;
-        const def = data.definition as DefinitionDraft;
+    client
+      .getSchema(appSlug)
+      .then((s) => {
+        const def = s.definition as unknown as DefinitionDraft;
         setVisualDraft(structuredClone(def));
-        if (!draftJson) setDraftJson(JSON.stringify(def, null, 2));
+        setDraftJson((prev) => prev || JSON.stringify(def, null, 2));
       })
       .catch(() => {});
   }, [appSlug]);
@@ -155,7 +154,7 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
 /* ------------------------------ helpers ------------------------------ */
 
 function emptyDraft(): DefinitionDraft {
-  return { app: { slug: '', name: '' }, entities: [], pages: [] };
+  return { app: { slug: '', name: '' }, entities: [], pages: [], workflows: [], policies: [] };
 }
 
 function Th({ children }: { children?: ReactNode }) {

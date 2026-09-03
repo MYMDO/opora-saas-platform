@@ -29,6 +29,8 @@ export interface DefinitionDraft {
     entity: string;
     view: { kind: string; columns?: string[] };
   }>;
+  workflows?: Array<Record<string, unknown>>;
+  policies?: Array<Record<string, unknown>>;
 }
 
 const FIELD_TYPES = [

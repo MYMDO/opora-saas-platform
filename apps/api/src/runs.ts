@@ -16,7 +16,7 @@ export interface WorkflowRunsPort {
   /** false — ключ уже існує → виконання пропускається (ідемпотентність) */
   tryStart(key: string, meta: { tenantId: string; workflowOn: string }): Promise<boolean>;
   finish(key: string, status: 'ok' | 'error' | 'skipped', error?: string): Promise<void>;
-  list(limit: number): Promise<WorkflowRunRow[]>;
+  list(tenantId: string, limit: number): Promise<WorkflowRunRow[]>;
 }
 
 export interface PendingOutboxEvent {
@@ -65,8 +65,10 @@ export class MemoryWorkflowRunsPort implements WorkflowRunsPort {
     }
   }
 
-  async list(limit: number): Promise<WorkflowRunRow[]> {
-    return structuredClone(this.rows.slice(-limit).reverse());
+  async list(tenantId: string, limit: number): Promise<WorkflowRunRow[]> {
+    return structuredClone(
+      this.rows.filter((r) => r.tenantId === tenantId).slice(-limit).reverse(),
+    );
   }
 }
 
@@ -206,13 +208,13 @@ export class D1WorkflowRunsPort implements WorkflowRunsPort {
       .run();
   }
 
-  async list(limit: number): Promise<WorkflowRunRow[]> {
+  async list(tenantId: string, limit: number): Promise<WorkflowRunRow[]> {
     const { results } = await this.db
       .prepare(
         `SELECT idempotency_key, tenant_id, workflow_on, status, error, created_at, finished_at
-         FROM workflow_runs ORDER BY created_at DESC LIMIT ?1`,
+         FROM workflow_runs WHERE tenant_id = ?1 ORDER BY created_at DESC LIMIT ?2`,
       )
-      .bind(Math.min(Math.max(limit, 1), 200))
+      .bind(tenantId, Math.min(Math.max(limit, 1), 200))
       .all<Record<string, unknown>>();
     return (results ?? []).map((r) => ({
       idempotencyKey: String(r.idempotency_key),

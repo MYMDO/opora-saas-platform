@@ -18,7 +18,7 @@ function nowIso(): string {
 function applyFilters(rows: RecordEntity[], q: QuerySpec | undefined): RecordEntity[] {
   const filters = q?.filters ?? {};
   return rows.filter((r) =>
-    Object.entries(filters).every(([k, v]) => r.data[k] === v),
+    Object.entries(filters).every(([k, v]) => (k === 'owner_id' ? r.ownerId === v : r.data[k] === v)),
   );
 }
 

@@ -68,7 +68,6 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
     setFilterField('');
     setFilterValue('');
     void reload(0, sort, {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema.version, entity.apiName]);
 
   const pickedField = entity.fields.find((f) => f.name === filterField) ?? null;

@@ -68,6 +68,17 @@ describe('SQL builders', () => {
     expect(s.sql).not.toContain('DESC');
   });
 
+  it('owner_id фільтрується через колонку, а не json', () => {
+    const s = buildListQuery(
+      { tenantId: 't1', appSlug: 'sd', actorId: null },
+      'ticket',
+      { filters: { owner_id: 'u1' } },
+    );
+    expect(s.sql).toContain('owner_id = ?4');
+    expect(s.sql).not.toContain("$.owner_id");
+    expect(s.params).toContain('u1');
+  });
+
   it('ігнорує фільтри з небезпечними ключами', () => {
     const s = buildListQuery(
       { tenantId: 't1', appSlug: 'sd', actorId: null },

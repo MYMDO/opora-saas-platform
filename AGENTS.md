@@ -26,16 +26,16 @@
 | Пакет | Роль | Тести |
 |---|---|---|
 | `packages/dsl` | Zod-схеми DSL + `parseAppDefinition`. Вирази (`allow`, `if`) НЕ виконуються. | 25 |
-| `packages/data-runtime` | DataPort-контракт: Memory + D1 адаптери; валідація записів; audit+outbox у мутаціях. SQL-білдери окремо від БД. | 14+ |
+| `packages/data-runtime` | DataPort-контракт: Memory + D1 адаптери; валідація записів; audit+outbox у мутаціях. SQL-білдери окремо від БД. | 16 |
 | `packages/metadata` | Реєстр застосунків і релізів (draft/publish/getActive/listReleases/updateDraft). DSL-валідація через @opora/dsl. | 13 |
-| `packages/workflow` | Матчинг workflow за подією, умови (проста рівність v1), executor (webhook/assign). | 12 |
+| `packages/workflow` | Матчинг workflow за подією, умови (проста рівність v1), executor (webhook/assign; function-values skip). | 12 |
 
 ### Застосунки
 
 | Застосунок | Роль | Deploy |
 |---|---|---|
-| `apps/api` | Hono runtime API: `/v1/apps` → releases/publish → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом. Auth: HMAC Bearer tokens. Record-level RBAC. | Workers: https://opora-core-api.p4d-b2q.workers.dev |
-| `apps/runtime-web` | Vite React SPA: generated table/form CRUD UI from published schema + Builder mode (entity editor, release manager). | Pages: https://opora-runtime.pages.dev |
+| `apps/api` | Hono runtime API: `/v1/apps` → releases/publish → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом. Auth: HMAC Bearer tokens. Record-level RBAC. | Workers: https://opora-core-api.p4d-b2q.workers.dev (28 тестів) |
+| `apps/runtime-web` | Vite React SPA: generated table/form CRUD UI from published schema + Builder mode (entity editor, release manager). | Pages: https://opora-runtime.pages.dev (6 тестів) |
 
 ### Заморожено
 
@@ -61,7 +61,10 @@ VITE_API_BASE=https://opora-core-api.p4d-b2q.workers.dev npm run build
 npx wrangler pages deploy dist --project-name opora-runtime --branch master
 ```
 
-CI пробігає lint + typecheck + test для всіх пакетів (`.github/workflows/ci.yml`).
+CI: `verify` (lint+typecheck+test) → `preflight` → `deploy` на master
+(`.github/workflows/ci.yml`). Deploy: D1 міграції remote → worker → Pages.
+Потрібні repo secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+Ручний запуск: Actions → CI → Run workflow.
 
 ## Правила
 
@@ -77,7 +80,7 @@ CI пробігає lint + typecheck + test для всіх пакетів (`.gi
 
 - Усі продуктові тексти українською; форматування чисел/дат uk-UA.
 - Модуль→колір: AI teal `--ai`, Energy amber `--energy`, Finance green `--finance`.
-- Дати — `formatDateUa()` (dd.mm.yyyy), числа — `formatNumberUa()`.
+- Дати — `new Date(x).toLocaleString('uk-UA')` інлайн (хелперів `formatDateUa` нема).
 - Без коментарів у коді якщо не запитано.
 
 ### Gotchas
@@ -86,4 +89,15 @@ CI пробігає lint + typecheck + test для всіх пакетів (`.gi
 - `AUTH_SECRET` та `DRAIN_KEY` — Cloudflare secrets (`npx wrangler secret put`).
 - Деякі мережі блокують `*.workers.dev`; фронтенд використовує same-origin Functions
   або CORS allow-list. Перевіряти що ALLOWED_ORIGINS включає домен фронтенду.
-- `wrangler deploy` треба запускати окремо після push — CI не деплоїть автоматично.
+- CI сам деплоїть прод після push у master (потрібні repo secrets,
+  див. Команди вище); вручну — Actions → CI → Run workflow.
+- `owner_id` — КОЛОНКА records, не поле data: D1-фільтр іде через `owner_id = ?`,
+  memory — через `r.ownerId`. Не шукати в `data`.
+- `runs.list(tenantId, limit)` — runs завжди скоупляться тенантом (лік між тенантами був багом).
+- Фронт ходить в API лише через `client.*` (абсолютний `API_BASE` + auth-заголовки).
+  Відносний `fetch('/v1/...')` повертає HTML SPA — Builder так ламався.
+- Візуальний редактор несе `workflows`/`policies` транзитом (`DefinitionDraft`);
+  не викидати ці ключі, інакше publish зітре автоматизації.
+- Дрейф спеки: `platform-spec.md` малює App всередині тенанта, реально `apps` глобальні
+  (ізоляція — на рівні records/audit/runs). users/memberships таблиці є, логін видає owner.
+- Неавторизовані читання ізольовані лише `X-Opora-Tenant`-заголовком (демо-трейдоф).

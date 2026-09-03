@@ -327,7 +327,7 @@ describe('automation drain', () => {
     expect(h.posts[0]?.url).toBe('https://hooks.test/catch');
     expect((h.posts[0]?.body as { event?: string }).event).toBe('ticket.created');
 
-    const runs = await h.runs.list(10);
+    const runs = await h.runs.list('demo', 10);
     // Обидва workflow виконано: slack-internal (skipped webhook) + test-hook (posted)
     expect(runs).toHaveLength(2);
     expect(runs.every((r) => r.status === 'ok')).toBe(true);
@@ -384,6 +384,16 @@ describe('automation drain', () => {
     expect(body.runs[0]?.workflowOn).toBe('ticket.created');
   });
 
+  it('workflow-runs ізольовані за тенантом', async () => {
+    const h = await harnessWithWebhookWorkflow();
+    await h.request('/v1/apps/hooked-app/data/ticket', jsonInit('POST', { title: 'Demo' }));
+    await h.request('/v1/apps/hooked-app/data/ticket', jsonInit('POST', { title: 'Acme' }, 'acme'));
+    await h.drain();
+    expect((await h.runs.list('demo', 10)).length).toBeGreaterThanOrEqual(2);
+    expect(await h.runs.list('acme', 10)).toHaveLength(2);
+    expect(await h.runs.list('other', 10)).toHaveLength(0);
+  });
+
   it('no-store на /v1/* відповідях', async () => {
     const res = await makeClient().request('/v1/health');
     expect(res.headers.get('Cache-Control')).toBe('no-store');
@@ -437,6 +447,31 @@ describe('record-level access control', () => {
     const acmeBody = (await acmeList.json()) as { records: Array<{ data: { title: string } }> };
     expect(acmeBody.records.map((r) => r.data.title)).toContain('ACME-квиток');
     expect(acmeBody.records.map((r) => r.data.title)).not.toContain('Demo-квиток');
+  });
+
+  it('member бачить у list лише власні записи', async () => {
+    const SECRET = 'member-list-test-secret-32-chars!';
+    const c = makeClient({ authSecret: SECRET });
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'ml-app', name: 'ML' }));
+    await c.request('/v1/apps/ml-app/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/ml-app/releases/1/publish', { method: 'POST' });
+    const tokA = await signToken({ userId: 'usr-a', email: 'a@x.ua', tenantSlug: 'demo', role: 'member' }, SECRET);
+    const tokB = await signToken({ userId: 'usr-b', email: 'b@x.ua', tenantSlug: 'demo', role: 'member' }, SECRET);
+    const post = (token: string, title: string) =>
+      c.request('/v1/apps/ml-app/data/ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title }),
+      });
+    expect((await post(tokA, 'A-квиток')).status).toBe(201);
+    expect((await post(tokB, 'B-квиток')).status).toBe(201);
+    const listA = await c.request('/v1/apps/ml-app/data/ticket', {
+      headers: { Authorization: `Bearer ${tokA}` },
+    });
+    const titles = (
+      (await listA.json()) as { records: Array<{ data: { title: string } }> }
+    ).records.map((r) => r.data.title);
+    expect(titles).toEqual(['A-квиток']);
   });
 
   it('audit event містить actorId після auth-запиту', async () => {
