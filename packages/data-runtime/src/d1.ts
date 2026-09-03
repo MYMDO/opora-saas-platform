@@ -95,8 +95,8 @@ export function buildAudit(a: AuditEvent): SqlStatement {
 
 export function buildOutbox(o: OutboxEvent): SqlStatement {
   return {
-    sql: 'INSERT INTO outbox_events (id, tenant_id, event_type, payload, created_at) VALUES (?1, ?2, ?3, ?4, ?5)',
-    params: [o.id, o.tenantId, o.eventType, JSON.stringify(o.payload), o.createdAt],
+    sql: 'INSERT INTO outbox_events (id, tenant_id, app_slug, event_type, payload, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)',
+    params: [o.id, o.tenantId, o.appSlug, o.eventType, JSON.stringify(o.payload), o.createdAt],
   };
 }
 

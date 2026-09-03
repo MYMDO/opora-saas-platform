@@ -102,7 +102,7 @@ describe('SQL builders', () => {
     expect(s.params[7]).toBe('{"title":"T"}');
   });
 
-  it('outbox пише тип події', () => {
+  it('outbox пише тип події та app_slug', () => {
     const s = buildOutbox({
       id: 'o-1',
       appSlug: 'service-desk',
@@ -111,7 +111,9 @@ describe('SQL builders', () => {
       payload: { recordId: 'r-1' },
       createdAt: '2026-08-23T00:00:00.000Z',
     });
-    expect(s.params[2]).toBe('ticket.created');
-    expect(s.params[3]).toBe('{"recordId":"r-1"}');
+    expect(s.sql).toContain('app_slug');
+    expect(s.params[2]).toBe('service-desk');
+    expect(s.params[3]).toBe('ticket.created');
+    expect(s.params[4]).toBe('{"recordId":"r-1"}');
   });
 });
