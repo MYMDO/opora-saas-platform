@@ -88,7 +88,11 @@ export default function RuntimeApp() {
   return (
     <div className="opora-root" style={{ display: 'flex', minHeight: '100vh' }}>
       <div className="panel hidden-desktop" style={{ width: 220, borderRadius: 0, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <div style={{ padding: '18px 16px' }}>
+        <div
+          style={{ padding: '18px 16px', cursor: 'pointer' }}
+          onClick={() => navigate('#/')}
+          title="На головну"
+        >
           <div className="f-display" style={{ fontSize: 15, fontWeight: 700 }}>ОПОРА</div>
           <div className="f-mono" style={{ fontSize: 10, color: 'var(--text-mute)' }}>PLATFORM</div>
         </div>
