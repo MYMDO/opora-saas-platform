@@ -34,6 +34,9 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<{ by: string; dir: 'asc' | 'desc' } | null>(null);
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filterField, setFilterField] = useState('');
+  const [filterValue, setFilterValue] = useState('');
 
   const PAGE_SIZE = 20;
 
@@ -46,10 +49,11 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
     [entity, formPage, tablePage],
   );
 
-  async function reload(nextPage = page, nextSort = sort) {
+  async function reload(nextPage = page, nextSort = sort, nextFilters = filters) {
     setRows(null);
     setRows(
       await client.listRecords(schema.definition.app.slug, entity.apiName, {
+        filters: Object.keys(nextFilters).length > 0 ? nextFilters : undefined,
         offset: nextPage * PAGE_SIZE,
         limit: PAGE_SIZE,
         sortBy: nextSort?.by,
@@ -60,9 +64,31 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
 
   useEffect(() => {
     setPage(0);
-    void reload(0);
+    setFilters({});
+    setFilterField('');
+    setFilterValue('');
+    void reload(0, sort, {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema.version, entity.apiName]);
+
+  const pickedField = entity.fields.find((f) => f.name === filterField) ?? null;
+
+  function applyFilter() {
+    if (!pickedField || filterValue === '') return;
+    const next = { ...filters, [pickedField.name]: filterValue };
+    setFilters(next);
+    setFilterValue('');
+    setPage(0);
+    void reload(0, sort, next);
+  }
+
+  function removeFilter(name: string) {
+    const next = { ...filters };
+    delete next[name];
+    setFilters(next);
+    setPage(0);
+    void reload(0, sort, next);
+  }
 
   function toggleSort(col: ColumnVM) {
     const next =
@@ -203,6 +229,68 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
           </div>
         </div>
       )}
+
+      <div className="panel" style={{ padding: '12px 18px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="f-mono" style={{ fontSize: 11, color: 'var(--text-mute)' }}>Фільтр:</span>
+        <select
+          className="input-row"
+          value={filterField}
+          onChange={(e) => { setFilterField(e.target.value); setFilterValue(''); }}
+          style={{ width: 170 }}
+        >
+          <option value="">— поле —</option>
+          {entity.fields.map((f) => (
+            <option key={f.name} value={f.name}>{f.label}</option>
+          ))}
+        </select>
+        {pickedField?.type === 'select' ? (
+          <select className="input-row" value={filterValue} onChange={(e) => setFilterValue(e.target.value)} style={{ width: 170 }}>
+            <option value="">— значення —</option>
+            {(pickedField.options ?? []).map((o) => (
+              <option key={o} value={o}>{o}</option>
+            ))}
+          </select>
+        ) : pickedField?.type === 'boolean' ? (
+          <select className="input-row" value={filterValue} onChange={(e) => setFilterValue(e.target.value)} style={{ width: 130 }}>
+            <option value="">—</option>
+            <option value="true">так</option>
+            <option value="false">ні</option>
+          </select>
+        ) : (
+          <input
+            className="input-row"
+            type={pickedField?.type === 'number' ? 'number' : 'text'}
+            placeholder="значення"
+            value={filterValue}
+            disabled={!pickedField}
+            onChange={(e) => setFilterValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') applyFilter(); }}
+            style={{ width: 170 }}
+          />
+        )}
+        <button className="btn btn-surface" onClick={applyFilter} disabled={!pickedField || filterValue === ''}>
+          Застосувати
+        </button>
+        {Object.entries(filters).map(([k, v]) => (
+          <span
+            key={k}
+            className="f-mono"
+            style={{
+              fontSize: 11.5,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 999,
+              padding: '3px 6px 3px 10px',
+              display: 'inline-flex',
+              gap: 6,
+              alignItems: 'center',
+            }}
+          >
+            {entity.fields.find((f) => f.name === k)?.label ?? k}: {v}
+            <button className="btn btn-icon" onClick={() => removeFilter(k)} title="Прибрати">✕</button>
+          </span>
+        ))}
+      </div>
 
       <div className="panel" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>

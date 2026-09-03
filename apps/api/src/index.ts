@@ -94,8 +94,8 @@ function mapDataError(c: CtxLike, e: unknown): Response {
   return c.json({ error: 'Внутрішня помилка сервера' }, 500);
 }
 
-function parseFilters(query: URLSearchParams): Record<string, string> {
-  const filters: Record<string, string> = {};
+function parseFilters(query: URLSearchParams): Record<string, string | number | boolean> {
+  const filters: Record<string, string | number | boolean> = {};
   for (const [k, v] of query.entries()) {
     if (!k.startsWith('_') && k !== 'limit') filters[k] = v;
   }
@@ -296,6 +296,18 @@ export function createApp(deps: ApiDeps) {
     const sortRaw = url.searchParams.get('_sort') ?? '';
     const sortBy = /^[a-zA-Z][a-zA-Z0-9_]*$/.test(sortRaw) ? sortRaw : undefined;
     const filters = parseFilters(url.searchParams);
+    const fieldTypes = new Map(def.fields.map((f) => [f.name, f.type]));
+    for (const [k, v] of Object.entries(filters)) {
+      const t = fieldTypes.get(k);
+      if (t === 'number' && typeof v === 'string') {
+        const n = Number(v);
+        if (v.trim() === '' || !Number.isFinite(n)) return c.json({ error: `фільтр ${k}: потрібне число` }, 400);
+        filters[k] = n;
+      } else if (t === 'boolean' && typeof v === 'string') {
+        if (v !== 'true' && v !== 'false') return c.json({ error: `фільтр ${k}: потрібне true або false` }, 400);
+        filters[k] = v === 'true';
+      }
+    }
     if (!isPrivileged(c)) {
       const uid = c.get('actorId');
       if (uid) filters.owner_id = uid;

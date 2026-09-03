@@ -135,6 +135,19 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
     expect((await evil.json()) as { records: Array<{ data: { title: string } }> }).toBeDefined();
   });
 
+  it('фільтр за boolean-полем: is_vip=true повертає лише VIP', async () => {
+    const c = await setupPublishedServiceDesk();
+    await c.request('/v1/apps/service-desk/data/contact', jsonInit('POST', { full_name: 'Звичайний', email: 'a@x.ua', is_vip: false }));
+    await c.request('/v1/apps/service-desk/data/contact', jsonInit('POST', { full_name: 'Важливий', email: 'b@x.ua', is_vip: true }));
+
+    const vip = await c.request('/v1/apps/service-desk/data/contact?is_vip=true');
+    const vipBody = (await vip.json()) as { records: Array<{ data: { full_name: string } }> };
+    expect(vipBody.records.map((r) => r.data.full_name)).toEqual(['Важливий']);
+
+    const bad = await c.request('/v1/apps/service-desk/data/contact?is_vip=yes');
+    expect(bad.status).toBe(400);
+  });
+
   it('валідація: невідоме поле та пропущений required дають 400 з issues', async () => {
     const c = await setupPublishedServiceDesk();
 
