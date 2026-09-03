@@ -3,6 +3,7 @@ import { client } from './client';
 import { getToken, getEmail, clearToken } from './auth-store';
 import { LoginForm } from './LoginForm';
 import { EntityWorkspace } from './EntityWorkspace';
+import { AuditPanel } from './AuditPanel';
 import { BuilderList } from './BuilderList';
 import { ReleaseManager } from './ReleaseManager';
 
@@ -10,10 +11,12 @@ const DEFAULT_SLUG = 'service-desk';
 
 type Route =
   | { view: 'runtime'; slug: string; entity: string | null }
-  | { view: 'builder'; appSlug: string | null };
+  | { view: 'builder'; appSlug: string | null }
+  | { view: 'audit' };
 
 function parseHash(): Route {
   const h = window.location.hash;
+  if (h.startsWith('#/audit')) return { view: 'audit' };
   if (h.startsWith('#/builder')) {
     const appMatch = /app=([a-z0-9-]+)/.exec(h);
     return { view: 'builder', appSlug: appMatch?.[1] ?? null };
@@ -43,7 +46,9 @@ export default function RuntimeApp() {
   const [error, setError] = useState<string | null>(null);
   const activeSlug = route.view === 'runtime'
     ? route.slug
-    : route.appSlug ?? DEFAULT_SLUG;
+    : route.view === 'builder'
+      ? route.appSlug ?? DEFAULT_SLUG
+      : DEFAULT_SLUG;
 
   useEffect(() => {
     if (!activeSlug) return;
@@ -76,6 +81,8 @@ export default function RuntimeApp() {
         <nav style={{ padding: '0 10px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
           <button className={`nav-item ${route.view === 'builder' ? 'active' : ''}`}
             onClick={() => navigate('#/builder')}>Builder</button>
+          <button className={`nav-item ${route.view === 'audit' ? 'active' : ''}`}
+            onClick={() => navigate('#/audit')}>Аудит</button>
           {schema && (
             <>
               <div className="f-mono" style={{ fontSize: 10, color: 'var(--text-mute)', padding: '6px 12px 2px' }}>
@@ -114,6 +121,7 @@ export default function RuntimeApp() {
       </div>
 
       <main style={{ flex: 1, minWidth: 0, padding: '20px 22px' }}>
+        {route.view === 'audit' && <AuditPanel />}
         {route.view === 'builder' && (
           <BuilderList onOpenApp={(slug: string) => navigate(`#/builder?app=${slug}`)} />
         )}

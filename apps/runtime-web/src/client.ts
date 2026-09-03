@@ -61,6 +61,18 @@ export interface RecordRow {
   data: Record<string, unknown>;
 }
 
+export interface AuditEvent {
+  id: string;
+  tenantId: string;
+  actorId: string | null;
+  action: 'create' | 'update' | 'delete';
+  resourceType: string;
+  resourceId: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  occurredAt: string;
+}
+
 /* ---------------------------- виклики ----------------------------- */
 
 export const client = {
@@ -102,4 +114,11 @@ export const client = {
     }).then((r) => r.record),
   deleteRecord: (slug: string, entity: string, id: string) =>
     req<{ ok: boolean }>(`/v1/apps/${slug}/data/${entity}/${id}`, { method: 'DELETE' }),
+  getAudit: (opts?: { limit?: number; action?: string }) => {
+    const params = new URLSearchParams();
+    if (opts?.limit !== undefined) params.set('limit', String(opts.limit));
+    if (opts?.action) params.set('action', opts.action);
+    const qs = params.toString() ? `?${params}` : '';
+    return req<{ events: AuditEvent[] }>(`/v1/audit${qs}`).then((r) => r.events);
+  },
 };
