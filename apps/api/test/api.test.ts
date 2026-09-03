@@ -27,6 +27,7 @@ function makeClient(opts?: {
   automation?: ApiDeps['automation'];
   drainKey?: string;
   authSecret?: string;
+  allowedOrigins?: string;
 }) {
   const metadata = opts?.metadata ?? new MemoryMetadataPort();
   const data = opts?.data ?? new MemoryDataPort();
@@ -36,6 +37,7 @@ function makeClient(opts?: {
     automation: opts?.automation,
     drainKey: opts?.drainKey,
     authSecret: opts?.authSecret,
+    allowedOrigins: opts?.allowedOrigins,
   });
   return {
     request(path: string, init?: RequestInit): Promise<Response> {
@@ -397,6 +399,15 @@ describe('automation drain', () => {
   it('no-store на /v1/* відповідях', async () => {
     const res = await makeClient().request('/v1/health');
     expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('CORS дозволяє Authorization для залогінених запитів з фронтенду', async () => {
+    const c = makeClient({ allowedOrigins: 'https://opora-runtime.pages.dev' });
+    const res = await c.request('/v1/health', {
+      headers: { Origin: 'https://opora-runtime.pages.dev' },
+    });
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://opora-runtime.pages.dev');
+    expect(res.headers.get('Access-Control-Allow-Headers')?.toLowerCase()).toContain('authorization');
   });
 });
 

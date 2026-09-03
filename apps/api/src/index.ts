@@ -62,7 +62,7 @@ function corsMiddleware(allowedOrigins: string | undefined) {
     if (origin && list.includes(origin)) {
       c.header('Access-Control-Allow-Origin', origin);
       c.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
-      c.header('Access-Control-Allow-Headers', 'Content-Type,X-Opora-Tenant');
+      c.header('Access-Control-Allow-Headers', 'Content-Type,X-Opora-Tenant,Authorization');
       c.header('Vary', 'Origin');
       c.header('Access-Control-Max-Age', '86400');
     }
