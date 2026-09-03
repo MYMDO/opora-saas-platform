@@ -1,5 +1,5 @@
 export { matchWorkflows, type EventRef } from './matcher';
-export { conditionMatches, parseSimpleEquality, type SimpleEquality } from './condition';
+export { conditionMatches, parseSimpleEquality, parseCondition, type SimpleEquality, type Condition, type ComparisonOp } from './condition';
 export {
   executeWorkflow,
   type ExecutorDeps,
