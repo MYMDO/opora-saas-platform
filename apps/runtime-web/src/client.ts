@@ -97,6 +97,7 @@ export const client = {
       limit?: number;
       sortBy?: string;
       sortDir?: 'asc' | 'desc';
+      q?: string;
     },
   ) => {
     const params = new URLSearchParams();
@@ -107,6 +108,7 @@ export const client = {
       params.set('_sort', opts.sortBy);
       if (opts.sortDir) params.set('_dir', opts.sortDir);
     }
+    if (opts?.q?.trim()) params.set('_q', opts.q.trim());
     const qs = params.toString() ? `?${params}` : '';
     return req<{ records: RecordRow[] }>(
       `/v1/apps/${slug}/data/${entity}${qs}`,

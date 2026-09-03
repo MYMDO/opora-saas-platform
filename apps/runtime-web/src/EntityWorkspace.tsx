@@ -37,6 +37,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [filterField, setFilterField] = useState('');
   const [filterValue, setFilterValue] = useState('');
+  const [q, setQ] = useState('');
   const [stats, setStats] = useState<Array<{ value: string | number | boolean | null; count: number }> | null>(null);
 
   const PAGE_SIZE = 20;
@@ -66,7 +67,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
     [entity, formPage, tablePage],
   );
 
-  async function reload(nextPage = page, nextSort = sort, nextFilters = filters) {
+  async function reload(nextPage = page, nextSort = sort, nextFilters = filters, nextQ = q) {
     setRows(null);
     setRows(
       await client.listRecords(schema.definition.app.slug, entity.apiName, {
@@ -75,6 +76,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
         limit: PAGE_SIZE,
         sortBy: nextSort?.by,
         sortDir: nextSort?.dir,
+        q: nextQ || undefined,
       }),
     );
   }
@@ -84,7 +86,8 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
     setFilters({});
     setFilterField('');
     setFilterValue('');
-    void reload(0, sort, {});
+    setQ('');
+    void reload(0, sort, {}, '');
   }, [schema.version, entity.apiName]);
 
   const pickedField = entity.fields.find((f) => f.name === filterField) ?? null;
@@ -247,6 +250,32 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
       )}
 
       <div className="panel" style={{ padding: '12px 18px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          className="input-row"
+          placeholder="Пошук…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              setPage(0);
+              void reload(0, sort, filters, e.currentTarget.value);
+            }
+          }}
+          style={{ width: 200 }}
+        />
+        {q && (
+          <button
+            className="btn btn-icon"
+            title="Очистити пошук"
+            onClick={() => {
+              setQ('');
+              setPage(0);
+              void reload(0, sort, filters, '');
+            }}
+          >
+            ✕
+          </button>
+        )}
         <span className="f-mono" style={{ fontSize: 11, color: 'var(--text-mute)' }}>Фільтр:</span>
         <select
           className="input-row"

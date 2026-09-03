@@ -25,8 +25,8 @@
 
 | Пакет | Роль | Тести |
 |---|---|---|
-| `packages/dsl` | Zod-схеми DSL + `parseAppDefinition`. Вирази (`allow`, `if`) НЕ виконуються. | 25 |
-| `packages/data-runtime` | DataPort-контракт: Memory + D1 адаптери; валідація записів; audit+outbox у мутаціях. SQL-білдери окремо від БД. | 16 |
+| `packages/dsl` | Zod-схеми DSL + `parseAppDefinition`. Вирази (`allow`, `if`) НЕ виконуються. Умови workflow: == != < <= > >= (числа). | 27 |
+| `packages/data-runtime` | DataPort-контракт: Memory + D1 адаптери; валідація записів; audit+outbox у мутаціях. SQL-білдери окремо від БД. Пошук _q (LIKE+escape), агрегації. | 22 |
 | `packages/metadata` | Реєстр застосунків і релізів (draft/publish/getActive/listReleases/updateDraft). DSL-валідація через @opora/dsl. | 13 |
 | `packages/workflow` | Матчинг workflow за подією, умови (проста рівність v1), executor (webhook/assign; function-values skip). | 12 |
 
@@ -34,7 +34,7 @@
 
 | Застосунок | Роль | Deploy |
 |---|---|---|
-| `apps/api` | Hono runtime API: `/v1/apps` → releases/publish → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом. Auth: HMAC Bearer tokens. Record-level RBAC. | Workers: https://opora-core-api.p4d-b2q.workers.dev (28 тестів) |
+| `apps/api` | Hono runtime API: `/v1/apps` → releases/publish → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом. Auth: HMAC Bearer tokens. Record-level RBAC. Stats + connections endpoints. | Workers: https://opora-core-api.p4d-b2q.workers.dev (33 тести) |
 | `apps/runtime-web` | Vite React SPA: generated table/form CRUD UI from published schema + Builder mode (entity editor, release manager). | Pages: https://opora-runtime.pages.dev (6 тестів) |
 
 ### Заморожено

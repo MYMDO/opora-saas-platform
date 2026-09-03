@@ -147,4 +147,25 @@ describe('SQL builders', () => {
       buildAggregateQuery({ tenantId: 't1', appSlug: 'sd', actorId: null }, 'ticket', "x'); DROP--", undefined),
     ).toThrow();
   });
+
+  it('search додає LIKE по текстових полях з екрануванням', () => {
+    const s = buildListQuery(
+      { tenantId: 't1', appSlug: 'sd', actorId: null },
+      'ticket',
+      { filters: { status: 'new' }, search: { fields: ['title', 'description'], query: '100%_гарантія' } },
+    );
+    expect(s.sql).toContain("json_extract(data, '$.title') LIKE ?5 ESCAPE '\\'");
+    expect(s.sql).toContain("json_extract(data, '$.description') LIKE ?5 ESCAPE '\\'");
+    expect(s.params[4]).toBe('%100\\%\\_гарантія%');
+    expect(s.sql).toMatch(/LIMIT \?\d+ OFFSET \?\d+/);
+  });
+
+  it('search ігнорує порожній запит і небезпечні поля', () => {
+    const s = buildListQuery(
+      { tenantId: 't1', appSlug: 'sd', actorId: null },
+      'ticket',
+      { search: { fields: ["x'); DROP--"], query: '   ' } },
+    );
+    expect(s.sql).not.toContain('LIKE');
+  });
 });

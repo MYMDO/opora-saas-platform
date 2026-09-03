@@ -17,8 +17,14 @@ function nowIso(): string {
 
 function applyFilters(rows: RecordEntity[], q: QuerySpec | undefined): RecordEntity[] {
   const filters = q?.filters ?? {};
+  const search = q?.search?.query.trim() ? q.search : undefined;
   return rows.filter((r) =>
-    Object.entries(filters).every(([k, v]) => (k === 'owner_id' ? r.ownerId === v : r.data[k] === v)),
+    Object.entries(filters).every(([k, v]) => (k === 'owner_id' ? r.ownerId === v : r.data[k] === v)) &&
+    (!search ||
+      search.fields.some((f) => {
+        const v = r.data[f];
+        return v !== null && v !== undefined && typeof v !== 'object' && String(v).toLowerCase().includes(search.query.trim().toLowerCase());
+      })),
   );
 }
 

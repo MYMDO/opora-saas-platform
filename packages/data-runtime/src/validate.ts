@@ -19,6 +19,8 @@ export interface RecordEntity {
 export interface QuerySpec {
   /** Фільтри рівності по полях data (пізніше — оператори) */
   filters?: Record<string, Json>;
+  /** Пошук підрядка (case-insensitive) по вказаних текстових полях */
+  search?: { fields: string[]; query: string };
   limit?: number;
   offset?: number;
   sortBy?: string;

@@ -183,6 +183,24 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
     expect(bad.status).toBe(400);
   });
 
+  it('пошук _q шукає підрядок у текстових полях', async () => {
+    const c = await setupPublishedServiceDesk();
+    await c.request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'Принтер не друкує' }));
+    await c.request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'Заміна картриджа' }));
+
+    const found = await c.request('/v1/apps/service-desk/data/ticket?_q=принтер');
+    const titles = (
+      (await found.json()) as { records: Array<{ data: { title: string } }> }
+    ).records.map((r) => r.data.title);
+    expect(titles).toEqual(['Принтер не друкує']);
+
+    const none = await c.request('/v1/apps/service-desk/data/ticket?_q=zzz');
+    expect(((await none.json()) as { records: unknown[] }).records).toHaveLength(0);
+
+    const wild = await c.request('/v1/apps/service-desk/data/ticket?_q=%');
+    expect(((await wild.json()) as { records: unknown[] }).records).toHaveLength(0);
+  });
+
   it('валідація: невідоме поле та пропущений required дають 400 з issues', async () => {
     const c = await setupPublishedServiceDesk();
 

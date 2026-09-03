@@ -100,10 +100,16 @@ export function buildOutbox(o: OutboxEvent): SqlStatement {
   };
 }
 
+/** Екранування LIKE-патерна: шукаємо буквальний підрядок, не шаблон. */
+export function escapeLike(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 export function buildWhere(
   ctx: DataPortContext,
   entity: string,
   filters: Record<string, Json> | undefined,
+  search?: { fields: string[]; query: string },
 ): { where: string[]; params: unknown[] } {
   const where = ['tenant_id = ?1', 'app_slug = ?2', 'entity = ?3', 'deleted_at IS NULL'];
   const params: unknown[] = [ctx.tenantId, ctx.appSlug, entity];
@@ -114,6 +120,13 @@ export function buildWhere(
     if (key === 'owner_id') where.push(`owner_id = ?${n}`);
     else where.push(`json_extract(data, '$.${key}') = ?${n}`);
     params.push(value);
+  }
+  const q = search?.query.trim() ?? '';
+  const fields = (search?.fields ?? []).filter((f) => FIELD_KEY_RE.test(f));
+  if (q && fields.length > 0) {
+    n += 1;
+    where.push(`(${fields.map((f) => `json_extract(data, '$.${f}') LIKE ?${n} ESCAPE '\\'`).join(' OR ')})`);
+    params.push(`%${escapeLike(q)}%`);
   }
   return { where, params };
 }
@@ -138,7 +151,7 @@ export function buildListQuery(
   entity: string,
   q: QuerySpec | undefined,
 ): SqlStatement {
-  const { where, params } = buildWhere(ctx, entity, q?.filters);
+  const { where, params } = buildWhere(ctx, entity, q?.filters, q?.search);
   const n = params.length;
   const limit = Math.min(Math.max(q?.limit ?? 100, 1), 500);
   const offset = Math.max(q?.offset ?? 0, 0);

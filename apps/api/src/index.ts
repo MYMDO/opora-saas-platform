@@ -350,8 +350,13 @@ export function createApp(deps: ApiDeps) {
     const bad = coerceFilters(c, def, filters);
     if (bad) return bad;
     scopeFilters(c, filters);
+    const searchRaw = (url.searchParams.get('_q') ?? '').trim();
+    const searchFields = def.fields
+      .filter((f) => f.type === 'text' || f.type === 'longtext' || f.type === 'select')
+      .map((f) => f.name);
     const page = await deps.data.list(dataCtx(c), def, {
       filters,
+      search: searchRaw && searchFields.length > 0 ? { fields: searchFields, query: searchRaw } : undefined,
       limit: Math.min(Math.max(limitRaw, 1), LIMIT_MAX),
       offset: Math.max(Number(url.searchParams.get('_offset')) || 0, 0),
       sortBy,

@@ -115,4 +115,16 @@ describe('MemoryDataPort — tenant boundary та audit/outbox', () => {
     const filtered = await port.aggregate(ctx, ticketEntity, { groupBy: 'status', filters: { title: 'A' } });
     expect(filtered).toEqual([{ value: 'new', count: 1 }]);
   });
+
+  it('search шукає підрядок без урахування регістру', async () => {
+    const port = new MemoryDataPort();
+    await port.create(ctx, ticketEntity, { title: 'Принтер не друкує' });
+    await port.create(ctx, ticketEntity, { title: 'Заміна картриджа' });
+    const found = await port.list(ctx, ticketEntity, { search: { fields: ['title'], query: 'принтер' } });
+    expect(found.rows.map((r) => r.data.title)).toEqual(['Принтер не друкує']);
+    const none = await port.list(ctx, ticketEntity, { search: { fields: ['title'], query: 'zzz' } });
+    expect(none.rows).toHaveLength(0);
+    const all = await port.list(ctx, ticketEntity, { search: { fields: ['title'], query: '   ' } });
+    expect(all.rows).toHaveLength(2);
+  });
 });
