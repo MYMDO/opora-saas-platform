@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { API_BASE } from './client';
 import { DefinitionEditor, buildFullDefinition, type DefinitionDraft } from './DefinitionEditor';
+import { AutomationPanel } from './AutomationPanel';
 
 interface ReleaseInfo {
   version: number;
@@ -144,6 +145,9 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
           </button>
         </div>
       </div>
+
+      {/* Автоматизації */}
+      <AutomationPanel appSlug={appSlug} />
     </div>
   );
 }

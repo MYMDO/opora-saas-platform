@@ -73,6 +73,16 @@ export interface AuditEvent {
   occurredAt: string;
 }
 
+export interface WorkflowRun {
+  idempotencyKey: string;
+  tenantId: string;
+  workflowOn: string;
+  status: 'running' | 'ok' | 'error' | 'skipped';
+  error?: string | null;
+  createdAt: string;
+  finishedAt?: string | null;
+}
+
 /* ---------------------------- виклики ----------------------------- */
 
 export const client = {
@@ -121,4 +131,6 @@ export const client = {
     const qs = params.toString() ? `?${params}` : '';
     return req<{ events: AuditEvent[] }>(`/v1/audit${qs}`).then((r) => r.events);
   },
+  getWorkflowRuns: (limit = 50) =>
+    req<{ runs: WorkflowRun[] }>(`/v1/workflow-runs?limit=${limit}`).then((r) => r.runs),
 };

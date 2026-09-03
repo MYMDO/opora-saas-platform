@@ -115,7 +115,7 @@ export function createApp(deps: ApiDeps) {
       if (payload) {
         c.set('tenantId', payload.tenantSlug);
         c.set('actorId', payload.userId);
-        c.set('role', 'admin');
+        c.set('role', payload.role === 'admin' || payload.role === 'owner' ? payload.role : 'member');
         await next();
         return;
       }
@@ -234,6 +234,7 @@ export function createApp(deps: ApiDeps) {
 
   app.get('/v1/workflow-runs', async (c) => {
     if (!deps.automation) return c.json({ error: 'автоматизації не налаштовані' }, 501);
+    if (!isPrivileged(c)) return c.json({ error: 'потрібна роль admin або owner' }, 403);
     const limit = Number(c.req.query('limit')) || 50;
     return c.json({ runs: await deps.automation.runs.list(limit) });
   });

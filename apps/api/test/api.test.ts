@@ -352,6 +352,38 @@ describe('automation drain', () => {
     expect(res.status).toBe(401);
   });
 
+  it('workflow-runs: member → 403, admin → 200 з runs після дрену', async () => {
+    const SECRET = 'runs-gate-test-secret-32-chars!';
+    const sharedOutbox: SharedOutboxRow[] = [];
+    const c = makeClient({
+      authSecret: SECRET,
+      data: new MemoryDataPort({ outbox: sharedOutbox }),
+      automation: {
+        outbox: new MemoryOutboxDrainPort(sharedOutbox),
+        runs: new MemoryWorkflowRunsPort(),
+        resolveConnection: () => null,
+        webhookPost: async () => ({ ok: true, status: 200 }),
+      },
+      drainKey: 'secret-key',
+    });
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'hooked-app', name: 'Hooked App' }));
+    await c.request('/v1/apps/hooked-app/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/hooked-app/releases/1/publish', { method: 'POST' });
+    await c.request('/v1/apps/hooked-app/data/ticket', jsonInit('POST', { title: 'Заявка' }));
+    await c.request('/v1/automation/drain', { method: 'POST', headers: { 'X-Drain-Key': 'secret-key' } });
+
+    const member = await signToken({ userId: 'u1', email: 'm@x.ua', tenantSlug: 'demo', role: 'member' }, SECRET);
+    const denied = await c.request('/v1/workflow-runs', { headers: { Authorization: `Bearer ${member}` } });
+    expect(denied.status).toBe(403);
+
+    const admin = await signToken({ userId: 'u2', email: 'a@x.ua', tenantSlug: 'demo', role: 'admin' }, SECRET);
+    const ok = await c.request('/v1/workflow-runs', { headers: { Authorization: `Bearer ${admin}` } });
+    expect(ok.status).toBe(200);
+    const body = (await ok.json()) as { runs: Array<{ status: string; workflowOn: string }> };
+    expect(body.runs.length).toBeGreaterThanOrEqual(1);
+    expect(body.runs[0]?.workflowOn).toBe('ticket.created');
+  });
+
   it('no-store на /v1/* відповідях', async () => {
     const res = await makeClient().request('/v1/health');
     expect(res.headers.get('Cache-Control')).toBe('no-store');
