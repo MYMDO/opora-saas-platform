@@ -408,7 +408,7 @@ describe('automation drain', () => {
       },
     });
     await c.request('/v1/apps', jsonInit('POST', { slug: 'hooked-app', name: 'Hooked App' }));
-    const def = structuredClone(fixture) as { workflows: Array<{ steps: Array<Record<string, unknown>> }> };
+    const def = structuredClone(fixture) as { workflows: Array<{ on: string; steps: Array<Record<string, unknown>> }> };
     def.workflows.push({ on: 'ticket.created', steps: [{ type: 'webhook', connection: 'test-hook', event: 'ticket.created' }] });
     await c.request('/v1/apps/hooked-app/releases', jsonInit('POST', def));
     await c.request('/v1/apps/hooked-app/releases/1/publish', { method: 'POST' });
