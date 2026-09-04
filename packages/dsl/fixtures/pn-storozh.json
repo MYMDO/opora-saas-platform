@@ -1,0 +1,46 @@
+{
+  "app": { "slug": "pn-storozh", "name": "ПН-сторож" },
+  "entities": [
+    {
+      "apiName": "counterparty",
+      "label": "Контрагент",
+      "fields": [
+        { "name": "name", "type": "text", "required": true, "maxLength": 200, "label": "Назва" },
+        { "name": "tax_id", "type": "text", "maxLength": 12, "label": "ЄДРПОУ/ІПН" },
+        { "name": "limit_amount", "type": "number", "default": 1000000, "label": "Ліміт суми" },
+        { "name": "is_active", "type": "boolean", "default": true, "label": "Активний" }
+      ]
+    },
+    {
+      "apiName": "invoice",
+      "label": "Податкова накладна",
+      "fields": [
+        { "name": "counterparty", "type": "relation", "target": "counterparty", "cardinality": "one", "label": "Контрагент" },
+        { "name": "amount", "type": "number", "required": true, "label": "Сума" },
+        { "name": "doc_date", "type": "date", "label": "Дата документа" },
+        { "name": "status", "type": "select", "options": ["draft", "sent", "registered", "blocked"], "default": "draft", "label": "Статус" },
+        { "name": "note", "type": "longtext", "label": "Примітка" }
+      ]
+    }
+  ],
+  "pages": [
+    { "path": "/counterparties", "label": "Контрагенти", "entity": "counterparty", "view": { "kind": "table", "columns": ["name", "tax_id", "limit_amount"] } },
+    { "path": "/counterparties/new", "label": "Новий контрагент", "entity": "counterparty", "view": { "kind": "form", "fields": ["name", "tax_id", "limit_amount", "is_active"] } },
+    { "path": "/invoices", "label": "Накладні", "entity": "invoice", "view": { "kind": "table", "columns": ["counterparty", "amount", "doc_date", "status"] } },
+    { "path": "/invoices/new", "label": "Нова накладна", "entity": "invoice", "view": { "kind": "form", "fields": ["counterparty", "amount", "doc_date", "status", "note"] } },
+    { "path": "/invoices/by-status", "label": "Суми за статусами", "entity": "invoice", "view": { "kind": "stats", "groupBy": "status", "sum": "amount" } }
+  ],
+  "policies": [],
+  "workflows": [
+    {
+      "on": "invoice.created",
+      "if": "record.amount >= 100000",
+      "steps": [{ "type": "webhook", "connection": "ops-hook", "event": "invoice.large" }]
+    },
+    {
+      "on": "invoice.created",
+      "if": "record.status == 'blocked'",
+      "steps": [{ "type": "webhook", "connection": "ops-hook", "event": "invoice.blocked" }]
+    }
+  ]
+}

@@ -419,6 +419,31 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
     expect(c.data.state.outbox.map((o) => o.eventType)).toContain('candidate.created');
   });
 
+  it('pn-storozh: суми накладних за статусами без коду платформи', async () => {
+    const pnFixture = JSON.parse(
+      readFileSync(join(__dirname, '../../../packages/dsl/fixtures/pn-storozh.json'), 'utf-8'),
+    );
+    const c = makeClient();
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'pn-storozh', name: 'ПН-сторож' }));
+    expect((await c.request('/v1/apps/pn-storozh/releases', jsonInit('POST', pnFixture))).status).toBe(201);
+    expect((await c.request('/v1/apps/pn-storozh/releases/1/publish', jsonInit('POST'))).status).toBe(200);
+
+    const cp = (await (
+      await c.request('/v1/apps/pn-storozh/data/counterparty', jsonInit('POST', { name: 'ТОВ Ромашка', tax_id: '12345678' }))
+    ).json()) as { record: { id: string } };
+    await c.request('/v1/apps/pn-storozh/data/invoice', jsonInit('POST', { counterparty: cp.record.id, amount: 150000, status: 'sent' }));
+    await c.request('/v1/apps/pn-storozh/data/invoice', jsonInit('POST', { counterparty: cp.record.id, amount: 50000, status: 'registered' }));
+
+    const sums = (await (
+      await c.request('/v1/apps/pn-storozh/data/invoice/stats?groupBy=status&sum=amount')
+    ).json()) as { groups: Array<{ value: string; count: number; sum: number | null }> };
+    expect(sums.groups).toEqual([
+      { value: 'sent', count: 1, sum: 150000 },
+      { value: 'registered', count: 1, sum: 50000 },
+    ]);
+    expect(c.data.state.outbox.map((o) => o.eventType)).toContain('invoice.created');
+  });
+
   it('/v1/me: без токена 401, з токеном actor+tenant', async () => {
     const SECRET = 'me-test-secret-32-chars!!!!!!!';
     const c = makeClient({ authSecret: SECRET });
