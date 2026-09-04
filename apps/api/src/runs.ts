@@ -29,6 +29,8 @@ export interface PendingOutboxEvent {
 
 export interface OutboxDrainPort {
   pending(limit: number): Promise<PendingOutboxEvent[]>;
+  /** Тенанти з будь-якою історією подій (для schedule-оцінки без нових подій). */
+  tenants(): Promise<string[]>;
   markProcessed(
     id: string,
     status: 'done' | 'skipped' | 'error',
@@ -125,6 +127,10 @@ export class MemoryOutboxDrainPort implements OutboxDrainPort {
       row.processError = error ?? null;
     }
   }
+
+  async tenants(): Promise<string[]> {
+    return [...new Set(this.events.map((e) => e.tenantId))].sort();
+  }
 }
 
 /* ----------------------------------- D1 -------------------------------- */
@@ -172,6 +178,13 @@ export class D1OutboxDrainPort implements OutboxDrainPort {
       )
       .bind(id, status, error ?? null)
       .run();
+  }
+
+  async tenants(): Promise<string[]> {
+    const { results } = await this.db
+      .prepare('SELECT DISTINCT tenant_id FROM outbox_events')
+      .all<Record<string, unknown>>();
+    return (results ?? []).map((r) => String(r.tenant_id)).sort();
   }
 }
 

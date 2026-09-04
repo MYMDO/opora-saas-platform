@@ -314,4 +314,35 @@ describe('policies та workflows', () => {
     });
     expectAppError(bad);
   });
+
+  it('27. schedule-workflow: тригер без сутності, aggregate валідується', () => {
+    const ok = base();
+    const ticket = entities(ok).find((e) => (e as { apiName?: string }).apiName === 'ticket') as
+      | { fields: Array<Record<string, unknown>> }
+      | undefined;
+    if (!ticket) throw new Error('fixture без ticket');
+    ticket.fields.push({ name: 'estimate_hours', label: 'Години', type: 'number' });
+    workflows(ok).push({
+      on: 'schedule',
+      if: 'record.sum >= 1000000',
+      aggregate: { entity: 'ticket', groupBy: 'status', sum: 'estimate_hours' },
+      steps: [{ type: 'webhook', connection: 'ops-hook', event: 'ticket.limit' }],
+    });
+    expect(() => parseAppDefinition(ok)).not.toThrow();
+
+    const noAgg = base();
+    workflows(noAgg).push({
+      on: 'schedule',
+      steps: [{ type: 'webhook', connection: 'ops-hook', event: 'x' }],
+    });
+    expectIssue(noAgg, 'workflows[1].aggregate', 'invalid_structure');
+
+    const badRef = base();
+    workflows(badRef).push({
+      on: 'schedule',
+      aggregate: { entity: 'ticket', groupBy: 'status', sum: 'nope' },
+      steps: [{ type: 'webhook', connection: 'ops-hook', event: 'x' }],
+    });
+    expectIssue(badRef, 'unknown_reference');
+  });
 });

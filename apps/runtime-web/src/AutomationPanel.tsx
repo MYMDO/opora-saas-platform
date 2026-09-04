@@ -12,6 +12,7 @@ interface WorkflowStep {
 interface WorkflowDef {
   on: string;
   if?: string;
+  aggregate?: { entity: string; groupBy: string; sum: string };
   steps: WorkflowStep[];
 }
 
@@ -79,6 +80,11 @@ export function AutomationPanel({ appSlug }: { appSlug: string }) {
             <span className="f-mono" style={{ fontSize: 12.5, fontWeight: 700 }}>на {w.on}</span>
             {w.if && (
               <span className="f-mono" style={{ fontSize: 11.5, color: 'var(--text-mute)' }}>якщо {w.if}</span>
+            )}
+            {w.aggregate && (
+              <span className="f-mono" style={{ fontSize: 11.5, color: 'var(--ai)' }}>
+                Σ {w.aggregate.sum} за {w.aggregate.groupBy} в {w.aggregate.entity}
+              </span>
             )}
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>

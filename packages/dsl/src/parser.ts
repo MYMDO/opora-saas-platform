@@ -113,6 +113,37 @@ export function parseAppDefinition(input: unknown): AppDefinition {
   }
 
   for (const [index, wf] of def.workflows.entries()) {
+    if (wf.on === 'schedule') {
+      const agg = wf.aggregate;
+      if (!agg) {
+        issues.push({
+          path: `workflows[${index}].aggregate`,
+          message: 'schedule-workflow потребує aggregate {entity, groupBy, sum}',
+          code: 'invalid_structure',
+        });
+        continue;
+      }
+      const aggEntity = def.entities.find((e) => e.apiName === agg.entity);
+      if (!aggEntity) {
+        issues.push({
+          path: `workflows[${index}].aggregate.entity`,
+          message: `агрегація для неіснуючої сутності "${agg.entity}"`,
+          code: 'unknown_reference',
+        });
+        continue;
+      }
+      const aggFields = new Set(aggEntity.fields.map((f) => f.name));
+      for (const ref of [agg.groupBy, agg.sum]) {
+        if (!aggFields.has(ref)) {
+          issues.push({
+            path: `workflows[${index}].aggregate`,
+            message: `агрегація посилається на невідоме поле "${ref}" сутності ${agg.entity}`,
+            code: 'unknown_reference',
+          });
+        }
+      }
+      continue;
+    }
     const entity = wf.on.split('.')[0] ?? '';
     if (!entityNames.has(entity)) {
       issues.push({

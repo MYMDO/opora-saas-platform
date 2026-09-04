@@ -158,10 +158,14 @@ export const WorkflowStepSchema = z.discriminatedUnion('type', [
 
 export const WorkflowDefinitionSchema = z.object({
   on: z.string().regex(
-    /^[a-z][a-z0-9_]*\.(created|updated|deleted)$/,
-    'on: очікується "<entity>.(created|updated|deleted)"',
+    /^([a-z][a-z0-9_]*\.(created|updated|deleted)|schedule)$/,
+    'on: очікується "<entity>.(created|updated|deleted)" або "schedule"',
   ),
   if: Expression.optional(),
+  /** Для on schedule: яку агрегацію оцінювати; рядки йдуть як {group, sum}. */
+  aggregate: z
+    .object({ entity: ApiNameSchema, groupBy: ApiNameSchema, sum: ApiNameSchema })
+    .optional(),
   steps: z.array(WorkflowStepSchema).min(1).max(20),
 });
 

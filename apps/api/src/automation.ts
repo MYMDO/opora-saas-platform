@@ -1,6 +1,6 @@
 import type { DataPort, Json } from '@opora/data-runtime';
 import type { MetadataPort } from '@opora/metadata';
-import { matchWorkflows, executeWorkflow } from '@opora/workflow';
+import { matchWorkflows, executeWorkflow, conditionMatches } from '@opora/workflow';
 import type { WorkflowRunsPort } from './runs';
 
 export interface PendingEvent {
@@ -13,6 +13,8 @@ export interface PendingEvent {
 
 export interface OutboxDrainPort {
   pending(limit: number): Promise<PendingEvent[]>;
+  /** Тенанти з будь-якою історією подій (для schedule-оцінки без нових подій). */
+  tenants(): Promise<string[]>;
   markProcessed(id: string, status: 'done' | 'skipped' | 'error', error?: string): Promise<void>;
 }
 
@@ -64,7 +66,113 @@ export class AutomationService {
       }
     }
 
+    await this.evaluateSchedules(report);
+
     return report;
+  }
+
+  /**
+   * Проактивні сторожі: schedule-workflows оцінюють агрегати (sum за групами)
+   * для тенантів з історією подій, без привʼязки до нових подій.
+   * Троттлінг — добовий бакет у ключі ідемпотентності: один алерт на групу в день.
+   */
+  private async evaluateSchedules(report: DrainReport): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10);
+    let tenants: string[] = [];
+    try {
+      tenants = await this.deps.outbox.tenants();
+    } catch (e) {
+      this.log(`schedule tenants failed: ${String(e)}`);
+      return;
+    }
+    if (tenants.length === 0) return;
+
+    let apps: Awaited<ReturnType<MetadataPort['listApps']>> = [];
+    try {
+      apps = await this.deps.metadata.listApps();
+    } catch (e) {
+      this.log(`schedule listApps failed: ${String(e)}`);
+      return;
+    }
+
+    for (const app of apps) {
+      let active: Awaited<ReturnType<MetadataPort['getActive']>> = null;
+      try {
+        active = await this.deps.metadata.getActive(app.slug);
+      } catch {
+        active = null;
+      }
+      if (!active) continue;
+      const scheduled = active.definition.workflows
+        .map((wf, index) => ({ wf, index }))
+        .filter(({ wf }) => wf.on === 'schedule' && wf.aggregate !== undefined);
+      if (scheduled.length === 0) continue;
+
+      for (const tenantId of tenants) {
+        for (const { wf, index } of scheduled) {
+          const agg = wf.aggregate;
+          if (!agg) continue;
+          const entityDef =
+            active.definition.entities.find((e) => e.apiName === agg.entity) ?? null;
+          if (!entityDef) continue;
+          let groups: Array<{ value: string | number | boolean | null; count: number; sum: number | null }> = [];
+          try {
+            groups = await this.deps.data.aggregate(
+              { tenantId, appSlug: app.slug, actorId: null },
+              entityDef,
+              { groupBy: agg.groupBy, sumBy: agg.sum },
+            );
+          } catch (e) {
+            this.log(`schedule aggregate failed: ${String(e)}`);
+            continue;
+          }
+          for (const g of groups) {
+            const recordData: Record<string, Json> = {
+              group: g.value as Json,
+              sum: g.sum as Json,
+            };
+            let verdict: boolean | null = null;
+            try {
+              verdict = wf.if === undefined ? true : conditionMatches(wf.if, recordData);
+            } catch {
+              verdict = null;
+            }
+            if (verdict !== true) continue;
+            const key = `schedule:${app.slug}:${index}:${typeof g.value}:${String(g.value)}:${today}`;
+            let started = false;
+            try {
+              started = await this.deps.runs.tryStart(key, { tenantId, workflowOn: 'schedule' });
+            } catch (e) {
+              this.log(`schedule tryStart failed: ${String(e)}`);
+              continue;
+            }
+            if (!started) continue;
+            try {
+              const result = await executeWorkflow(wf, recordData, {
+                resolveConnection: (connection) => this.deps.resolveConnection(connection),
+                webhookPost: (url, body) => this.deps.webhookPost(url, body),
+                applyRecordPatch: async () => {
+                  throw new Error('schedule без запису: assign недоступний');
+                },
+                log: (s) => this.log(`schedule step: ${JSON.stringify(s)}`),
+              });
+              const failedStep = result.steps.find((s) => s.status === 'error');
+              const allSkipped =
+                result.steps.length > 0 && result.steps.every((s) => s.status === 'skipped');
+              const runStatus = result.ok ? (allSkipped ? 'skipped' : 'ok') : 'error';
+              await this.deps.runs.finish(key, runStatus, failedStep?.detail);
+              report[runStatus] += 1;
+              report.processed += 1;
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              await this.deps.runs.finish(key, 'error', msg);
+              report.error += 1;
+              report.processed += 1;
+            }
+          }
+        }
+      }
+    }
   }
 
   private async processOne(event: PendingEvent, report: DrainReport): Promise<void> {

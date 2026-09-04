@@ -624,6 +624,51 @@ describe('automation drain', () => {
     expect(await runs.list('demo', 10)).toEqual([expect.objectContaining({ status: 'skipped' })]);
   });
 
+  it('schedule-workflow: сума за групою ≥ порога шле webhook раз на день', async () => {
+    const shared: SharedOutboxRow[] = [];
+    const runs = new MemoryWorkflowRunsPort();
+    const posts: Array<{ url: string; body: unknown }> = [];
+    const c = makeClient({
+      data: new MemoryDataPort({ outbox: shared }),
+      automation: {
+        outbox: new MemoryOutboxDrainPort(shared),
+        runs,
+        resolveConnection: (slug: string) => (slug === 'test-hook' ? 'https://hooks.test/catch' : null),
+        webhookPost: async (url: string, body: unknown) => {
+          posts.push({ url, body });
+          return { ok: true, status: 200 };
+        },
+      },
+      drainKey: 'secret-key',
+    });
+    const hrFixture = JSON.parse(
+      readFileSync(join(__dirname, '../../../packages/dsl/fixtures/hr-desk.json'), 'utf-8'),
+    ) as { workflows: Array<Record<string, unknown>> };
+    hrFixture.workflows.push({
+      on: 'schedule',
+      if: 'record.sum >= 8',
+      aggregate: { entity: 'candidate', groupBy: 'stage', sum: 'rating' },
+      steps: [{ type: 'webhook', connection: 'test-hook', event: 'candidate.stage_sum' }],
+    });
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'sched-app', name: 'Sched' }));
+    await c.request('/v1/apps/sched-app/releases', jsonInit('POST', hrFixture));
+    await c.request('/v1/apps/sched-app/releases/1/publish', { method: 'POST' });
+    await c.request('/v1/apps/sched-app/data/candidate', jsonInit('POST', { full_name: 'A', stage: 'hired', rating: 5 }));
+    await c.request('/v1/apps/sched-app/data/candidate', jsonInit('POST', { full_name: 'B', stage: 'hired', rating: 3 }));
+    await c.request('/v1/apps/sched-app/data/candidate', jsonInit('POST', { full_name: 'C', stage: 'new', rating: 1 }));
+
+    const drain = () =>
+      c.request('/v1/automation/drain', { method: 'POST', headers: { 'X-Drain-Key': 'secret-key' } });
+    await drain();
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.body).toMatchObject({ event: 'schedule', record: { group: 'hired', sum: 8 } });
+    const schedRuns = (await runs.list('demo', 50)).filter((r) => r.workflowOn === 'schedule');
+    expect(schedRuns).toEqual([expect.objectContaining({ status: 'ok' })]);
+
+    await drain();
+    expect(posts).toHaveLength(1);
+  });
+
   it('невірний ключ дрену → 401', async () => {
     const h = await harnessWithWebhookWorkflow();
     const res = await h.request('/v1/automation/drain', {
