@@ -32,13 +32,20 @@ export interface OutboxEvent {
  * Єдиний спосіб доступу до даних застосунків (ADR 0001.2).
  * Реалізації зобовʼязані: ізолювати тенант, писати audit+outbox разом зі змінами.
  */
+export interface AggregateGroup {
+  value: string | number | boolean | null;
+  count: number;
+  /** Сума числового поля (null — без sumBy або нема сумовних значень). */
+  sum: number | null;
+}
+
 export interface DataPort {
   list(ctx: DataPortContext, entity: EntityDefinition, q?: QuerySpec): Promise<Page<RecordEntity>>;
   aggregate(
     ctx: DataPortContext,
     entity: EntityDefinition,
-    opts: { groupBy: string; filters?: Record<string, Json> },
-  ): Promise<Array<{ value: string | number | boolean | null; count: number }>>;
+    opts: { groupBy: string; filters?: Record<string, Json>; sumBy?: string },
+  ): Promise<AggregateGroup[]>;
   get(ctx: DataPortContext, entity: EntityDefinition, id: string): Promise<RecordEntity | null>;
   create(
     ctx: DataPortContext,

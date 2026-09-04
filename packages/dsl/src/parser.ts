@@ -89,7 +89,7 @@ export function parseAppDefinition(input: unknown): AppDefinition {
       page.view.kind === 'form'
         ? page.view.fields
         : page.view.kind === 'stats'
-          ? [page.view.groupBy]
+          ? [page.view.groupBy, ...(page.view.sum ? [page.view.sum] : [])]
           : page.view.columns;
     for (const name of listed) {
       if (!fieldNames.has(name)) {

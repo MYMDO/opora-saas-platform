@@ -204,7 +204,7 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
     });
     expect(resA.status).toBe(200);
     expect((await resA.json()) as { groups: unknown[] }).toEqual({
-      groups: [{ value: 'new', count: 2 }],
+      groups: [{ value: 'new', count: 2, sum: null }],
       releaseVersion: 1,
     });
 
@@ -212,6 +212,31 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
       headers: { Authorization: `Bearer ${tokA}` },
     });
     expect(bad.status).toBe(400);
+  });
+
+  it('stats з sum підсумовує числове поле; нечислове → 400', async () => {
+    const c = await setupPublishedServiceDesk();
+    await c.request('/v1/apps/service-desk/data/ticket', jsonInit('POST', { title: 'T1' }));
+    const res = await c.request('/v1/apps/service-desk/data/contact/stats?groupBy=is_vip&sum=nope');
+    expect(res.status).toBe(400);
+    const notNum = await c.request('/v1/apps/service-desk/data/contact/stats?groupBy=is_vip&sum=email');
+    expect(notNum.status).toBe(400);
+
+    const hrFixture = JSON.parse(
+      readFileSync(join(__dirname, '../../../packages/dsl/fixtures/hr-desk.json'), 'utf-8'),
+    );
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'hr-sum', name: 'HR Sum' }));
+    await c.request('/v1/apps/hr-sum/releases', jsonInit('POST', hrFixture));
+    await c.request('/v1/apps/hr-sum/releases/1/publish', { method: 'POST' });
+    await c.request('/v1/apps/hr-sum/data/candidate', jsonInit('POST', { full_name: 'Олена', stage: 'hired', rating: 5 }));
+    await c.request('/v1/apps/hr-sum/data/candidate', jsonInit('POST', { full_name: 'Ігор', stage: 'hired', rating: 3 }));
+    await c.request('/v1/apps/hr-sum/data/candidate', jsonInit('POST', { full_name: 'Петро', stage: 'new' }));
+    const summed = await c.request('/v1/apps/hr-sum/data/candidate/stats?groupBy=stage&sum=rating');
+    expect(summed.status).toBe(200);
+    expect(((await summed.json()) as { groups: unknown[] }).groups).toEqual([
+      { value: 'hired', count: 2, sum: 8 },
+      { value: 'new', count: 1, sum: null },
+    ]);
   });
 
   it('пошук _q шукає підрядок у текстових полях', async () => {

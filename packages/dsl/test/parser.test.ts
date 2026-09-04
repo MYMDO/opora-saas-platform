@@ -290,4 +290,28 @@ describe('policies та workflows', () => {
     });
     expectAppError(d);
   });
+
+  it('26. stats-view з sum валідує обидва поля', () => {
+    const ok = base();
+    const ticket = entities(ok).find((e) => (e as { apiName?: string }).apiName === 'ticket') as
+      | { fields: Array<Record<string, unknown>> }
+      | undefined;
+    if (!ticket) throw new Error('fixture без ticket');
+    ticket.fields.push({ name: 'estimate_hours', label: 'Години', type: 'number' });
+    pages(ok).push({
+      path: '/stats',
+      label: 'Статистика',
+      entity: 'ticket',
+      view: { kind: 'stats', groupBy: 'status', sum: 'estimate_hours' },
+    });
+    expect(() => parseAppDefinition(ok)).not.toThrow();
+    const bad = base();
+    pages(bad).push({
+      path: '/stats',
+      label: 'Статистика',
+      entity: 'ticket',
+      view: { kind: 'stats', groupBy: 'status', sum: 'nope' },
+    });
+    expectAppError(bad);
+  });
 });

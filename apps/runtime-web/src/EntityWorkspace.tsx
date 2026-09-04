@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { client, type RecordRow } from './client';
+import { client, type RecordRow, type StatsGroup } from './client';
 import {
   formatCellValue,
   resolveFormFields,
@@ -39,7 +39,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
   const [filterField, setFilterField] = useState('');
   const [filterValue, setFilterValue] = useState('');
   const [q, setQ] = useState('');
-  const [stats, setStats] = useState<Array<{ value: string | number | boolean | null; count: number }> | null>(null);
+  const [stats, setStats] = useState<StatsGroup[] | null>(null);
 
   const PAGE_SIZE = 20;
 
@@ -48,6 +48,7 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
   const statsPage = pages.find((p) => p.entity === entity.apiName && p.view.kind === 'stats');
 
   const statsGroupBy = statsPage?.view.groupBy ?? null;
+  const statsSumBy = statsPage?.view.sum ?? null;
   const statsFieldType = entity.fields.find((f) => f.name === statsGroupBy)?.type ?? 'text';
 
   useEffect(() => {
@@ -57,10 +58,10 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
     }
     setStats(null);
     client
-      .getStats(schema.definition.app.slug, entity.apiName, statsGroupBy)
+      .getStats(schema.definition.app.slug, entity.apiName, statsGroupBy, statsSumBy ?? undefined)
       .then(setStats)
       .catch(() => setStats([]));
-  }, [schema.definition.app.slug, entity.apiName, statsGroupBy]);
+  }, [schema.definition.app.slug, entity.apiName, statsGroupBy, statsSumBy]);
 
   const columns = useMemo(() => resolveTableColumns(entity, tablePage), [entity, tablePage]);
   const formFields = useMemo(
@@ -357,7 +358,9 @@ export function EntityWorkspace({ schema, entity, pages }: Props) {
                 <div style={{ flex: 1, height: 8, background: 'var(--surface)', borderRadius: 999, overflow: 'hidden' }}>
                   <div style={{ width: `${Math.round((g.count / max) * 100)}%`, height: '100%', background: 'var(--ai)', borderRadius: 999 }} />
                 </div>
-                <span className="f-mono" style={{ width: 40, textAlign: 'right', fontSize: 12 }}>{g.count}</span>
+                <span className="f-mono" style={{ minWidth: 40, textAlign: 'right', fontSize: 12 }}>
+                  {g.count}{g.sum !== null && g.sum !== undefined ? ` · Σ ${g.sum}` : ''}
+                </span>
               </div>
             );
           })}

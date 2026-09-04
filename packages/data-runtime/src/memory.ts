@@ -1,7 +1,7 @@
 
 import type { EntityDefinition } from '@opora/dsl';
 import { RecordNotFoundError } from './errors';
-import type { AuditEvent, DataPort, DataPortContext, OutboxEvent } from './port';
+import type { AggregateGroup, AuditEvent, DataPort, DataPortContext, OutboxEvent } from './port';
 import type { Json, Page, QuerySpec, RecordEntity } from './validate';
 import { validateRecord } from './validate';
 
@@ -91,10 +91,10 @@ export class MemoryDataPort implements DataPort {
   async aggregate(
     ctx: DataPortContext,
     entity: EntityDefinition,
-    opts: { groupBy: string; filters?: Record<string, Json> },
-  ): Promise<Array<{ value: string | number | boolean | null; count: number }>> {
+    opts: { groupBy: string; filters?: Record<string, Json>; sumBy?: string },
+  ): Promise<AggregateGroup[]> {
     const rows = applyFilters(this.scoped(ctx, entity), { filters: opts.filters });
-    const counts = new Map<string, { value: string | number | boolean | null; count: number }>();
+    const counts = new Map<string, AggregateGroup & { hasSum: boolean }>();
     for (const r of rows) {
       const raw = r.data[opts.groupBy];
       const value =
@@ -102,11 +102,21 @@ export class MemoryDataPort implements DataPort {
           ? null
           : (raw as string | number | boolean);
       const key = `${typeof value}:${String(value)}`;
-      const slot = counts.get(key) ?? { value, count: 0 };
+      const slot = counts.get(key) ?? { value, count: 0, sum: null, hasSum: false };
       slot.count += 1;
+      if (opts.sumBy) {
+        const sv = r.data[opts.sumBy];
+        if (typeof sv === 'number' && Number.isFinite(sv)) {
+          slot.sum = (slot.sum ?? 0) + sv;
+          slot.hasSum = true;
+        }
+      }
       counts.set(key, slot);
     }
-    return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 500);
+    return [...counts.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 500)
+      .map(({ value, count, sum }) => ({ value, count, sum }));
   }
 
   async get(ctx: DataPortContext, entity: EntityDefinition, id: string): Promise<RecordEntity | null> {

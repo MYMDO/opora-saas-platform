@@ -1,4 +1,5 @@
 export type {
+  AggregateGroup,
   AuditEvent,
   DataPort,
   DataPortContext,

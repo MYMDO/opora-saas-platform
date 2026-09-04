@@ -1,7 +1,7 @@
 
 import type { EntityDefinition } from '@opora/dsl';
 import { RecordNotFoundError } from './errors';
-import type { AuditEvent, DataPort, DataPortContext, OutboxEvent } from './port';
+import type { AggregateGroup, AuditEvent, DataPort, DataPortContext, OutboxEvent } from './port';
 import { validateRecord } from './validate';
 import type { Json, Page, QuerySpec, RecordEntity } from './validate';
 
@@ -138,12 +138,18 @@ export function buildAggregateQuery(
   entity: string,
   groupBy: string,
   filters: Record<string, Json> | undefined,
+  sumBy?: string,
 ): SqlStatement {
   if (!FIELD_KEY_RE.test(groupBy)) throw new Error(`некоректне поле групування: ${groupBy}`);
+  if (sumBy !== undefined && !FIELD_KEY_RE.test(sumBy)) throw new Error(`некоректне поле суми: ${sumBy}`);
   const { where, params } = buildWhere(ctx, entity, filters);
   const expr = `json_extract(data, '$.${groupBy}')`;
+  const select =
+    sumBy === undefined
+      ? `${expr} AS v, COUNT(*) AS c`
+      : `${expr} AS v, COUNT(*) AS c, SUM(CAST(json_extract(data, '$.${sumBy}') AS REAL)) AS s`;
   return {
-    sql: `SELECT ${expr} AS v, COUNT(*) AS c FROM records WHERE ${where.join(' AND ')} GROUP BY ${expr} ORDER BY c DESC LIMIT 500`,
+    sql: `SELECT ${select} FROM records WHERE ${where.join(' AND ')} GROUP BY ${expr} ORDER BY c DESC LIMIT 500`,
     params,
   };
 }
@@ -185,17 +191,18 @@ export class D1DataPort implements DataPort {
   async aggregate(
     ctx: DataPortContext,
     entity: EntityDefinition,
-    opts: { groupBy: string; filters?: Record<string, Json> },
-  ): Promise<Array<{ value: string | number | boolean | null; count: number }>> {
+    opts: { groupBy: string; filters?: Record<string, Json>; sumBy?: string },
+  ): Promise<AggregateGroup[]> {
     const { results } = await this.prep(
-      buildAggregateQuery(ctx, entity.apiName, opts.groupBy, opts.filters),
-    ).all<{ v: unknown; c: number }>();
+      buildAggregateQuery(ctx, entity.apiName, opts.groupBy, opts.filters, opts.sumBy),
+    ).all<{ v: unknown; c: number; s?: unknown }>();
     return (results ?? []).map((r) => ({
       value:
         r.v === null || r.v === undefined || typeof r.v === 'object'
           ? null
           : (r.v as string | number | boolean),
       count: Number(r.c),
+      sum: typeof r.s === 'number' && Number.isFinite(r.s) ? r.s : null,
     }));
   }
 

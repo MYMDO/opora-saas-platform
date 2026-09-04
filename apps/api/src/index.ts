@@ -95,10 +95,13 @@ function mapDataError(c: CtxLike, e: unknown): Response {
   return c.json({ error: 'Внутрішня помилка сервера' }, 500);
 }
 
+/** Query-параметри зі значенням для API, а не фільтри записів. */
+const RESERVED_QUERY_PARAMS = new Set(['limit', 'groupBy', 'sum']);
+
 function parseFilters(query: URLSearchParams): Record<string, string | number | boolean> {
   const filters: Record<string, string | number | boolean> = {};
   for (const [k, v] of query.entries()) {
-    if (!k.startsWith('_') && k !== 'limit' && k !== 'groupBy') filters[k] = v;
+    if (!k.startsWith('_') && !RESERVED_QUERY_PARAMS.has(k)) filters[k] = v;
   }
   return filters;
 }
@@ -425,11 +428,21 @@ export function createApp(deps: ApiDeps) {
     const groupBy = url.searchParams.get('groupBy') ?? '';
     const field = def.fields.find((f) => f.name === groupBy);
     if (!field) return c.json({ error: `невідоме поле групування: ${groupBy || '—'}` }, 400);
+    const sumRaw = url.searchParams.get('sum') ?? '';
+    const sumField = sumRaw ? def.fields.find((f) => f.name === sumRaw) : undefined;
+    if (sumRaw && !sumField) return c.json({ error: `невідоме поле суми: ${sumRaw}` }, 400);
+    if (sumField && sumField.type !== 'number') {
+      return c.json({ error: `поле ${sumRaw} не числове` }, 400);
+    }
     const filters = parseFilters(url.searchParams);
     const bad = coerceFilters(c, def, filters);
     if (bad) return bad;
     scopeFilters(c, filters);
-    const groups = await deps.data.aggregate(dataCtx(c), def, { groupBy, filters });
+    const groups = await deps.data.aggregate(dataCtx(c), def, {
+      groupBy,
+      filters,
+      sumBy: sumField ? sumRaw : undefined,
+    });
     const normalized = groups.map((g) => ({
       value:
         field.type === 'boolean'
@@ -440,6 +453,7 @@ export function createApp(deps: ApiDeps) {
               : null
           : g.value,
       count: g.count,
+      sum: g.sum,
     }));
     return c.json({ groups: normalized, releaseVersion: c.get('releaseVersion') });
   });

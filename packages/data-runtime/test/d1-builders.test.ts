@@ -143,6 +143,24 @@ describe('SQL builders', () => {
     expect(s.sql).toContain('LIMIT 500');
   });
 
+  it('aggregate з sumBy додає SUM(CAST … AS REAL)', () => {
+    const s = buildAggregateQuery(
+      { tenantId: 't1', appSlug: 'sd', actorId: null },
+      'ticket',
+      'status',
+      undefined,
+      'estimate_hours',
+    );
+    expect(s.sql).toContain("SUM(CAST(json_extract(data, '$.estimate_hours') AS REAL)) AS s");
+    expect(s.sql).toContain('GROUP BY');
+  });
+
+  it('aggregate відхиляє небезпечне поле суми', () => {
+    expect(() =>
+      buildAggregateQuery({ tenantId: 't1', appSlug: 'sd', actorId: null }, 'ticket', 'status', undefined, "x'); DROP--"),
+    ).toThrow();
+  });
+
   it('aggregate відхиляє небезпечне поле', () => {
     expect(() =>
       buildAggregateQuery({ tenantId: 't1', appSlug: 'sd', actorId: null }, 'ticket', "x'); DROP--", undefined),

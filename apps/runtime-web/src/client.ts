@@ -54,7 +54,13 @@ export interface PageVM {
   path: string;
   label: string;
   entity: string;
-  view: { kind: string; columns?: string[]; fields?: string[]; groupBy?: string };
+  view: { kind: string; columns?: string[]; fields?: string[]; groupBy?: string; sum?: string };
+}
+
+export interface StatsGroup {
+  value: string | number | boolean | null;
+  count: number;
+  sum: number | null;
 }
 
 export interface PublishedSchema {
@@ -181,9 +187,11 @@ export const client = {
   },
   getWorkflowRuns: (limit = 50) =>
     req<{ runs: WorkflowRun[] }>(`/v1/workflow-runs?limit=${limit}`).then((r) => r.runs),
-  getStats: (slug: string, entity: string, groupBy: string) =>
-    req<{ groups: Array<{ value: string | number | boolean | null; count: number }> }>(
-      `/v1/apps/${slug}/data/${entity}/stats?groupBy=${encodeURIComponent(groupBy)}`,
+  getStats: (slug: string, entity: string, groupBy: string, sumBy?: string) =>
+    req<{ groups: StatsGroup[] }>(
+      `/v1/apps/${slug}/data/${entity}/stats?groupBy=${encodeURIComponent(groupBy)}${
+        sumBy ? `&sum=${encodeURIComponent(sumBy)}` : ''
+      }`,
     ).then((r) => r.groups),
   getConnections: () =>
     req<{ connections: Array<{ slug: string; configured: boolean }> }>('/v1/connections').then(

@@ -109,11 +109,28 @@ describe('MemoryDataPort — tenant boundary та audit/outbox', () => {
     await port.create({ ...ctx, tenantId: 'other' }, ticketEntity, { title: 'D', status: 'done' });
     const groups = await port.aggregate(ctx, ticketEntity, { groupBy: 'status' });
     expect(groups).toEqual([
-      { value: 'done', count: 2 },
-      { value: 'new', count: 1 },
+      { value: 'done', count: 2, sum: null },
+      { value: 'new', count: 1, sum: null },
     ]);
     const filtered = await port.aggregate(ctx, ticketEntity, { groupBy: 'status', filters: { title: 'A' } });
-    expect(filtered).toEqual([{ value: 'new', count: 1 }]);
+    expect(filtered).toEqual([{ value: 'new', count: 1, sum: null }]);
+  });
+
+  it('aggregate з sumBy сумує числа, межі дають null', async () => {
+    const port = new MemoryDataPort();
+    await port.create(ctx, ticketEntity, { title: 'A', status: 'new', estimate_hours: 5 });
+    await port.create(ctx, ticketEntity, { title: 'B', status: 'new', estimate_hours: 3 });
+    await port.create(ctx, ticketEntity, { title: 'C', status: 'done' });
+    const groups = await port.aggregate(ctx, ticketEntity, { groupBy: 'status', sumBy: 'estimate_hours' });
+    expect(groups).toEqual([
+      { value: 'new', count: 2, sum: 8 },
+      { value: 'done', count: 1, sum: null },
+    ]);
+    const empty = await port.aggregate({ ...ctx, tenantId: 'void' }, ticketEntity, {
+      groupBy: 'status',
+      sumBy: 'estimate_hours',
+    });
+    expect(empty).toEqual([]);
   });
 
   it('search шукає підрядок без урахування регістру', async () => {
