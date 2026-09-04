@@ -45,9 +45,14 @@ export interface MetadataPort {
   /** Валідує визначення через @opora/dsl; кидає MetadataError('invalid_definition'). */
   createDraft(appSlug: string, definitionInput: unknown): Promise<ReleaseMeta>;
   publish(appSlug: string, version: number): Promise<ReleaseMeta>;
+  /** Повертає активний реліз на раніший published (відкат без втрати історії).
+   * Кидає not_found (нема застосунку/релізу), invalid_definition (реліз не published). */
+  rollback(appSlug: string, version: number): Promise<ReleaseMeta>;
   getActive(
     appSlug: string,
   ): Promise<{ version: number; definition: AppDefinition } | null>;
+  /** Повертає будь-який реліз за версією (draft включно) або null. */
+  getRelease(appSlug: string, version: number): Promise<ReleaseMeta | null>;
   listReleases(appSlug: string): Promise<Array<{
     version: number;
     status: string;

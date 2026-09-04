@@ -14,9 +14,15 @@
 3. `docs/architecture/decision-records/0001-pivot-to-configurable-platform.md` —
    півот: повний перехід на конфігуровану платформу, гібридний порт даних,
    монорепо pnpm+turbo.
-4. `docs/research/ПЛАН_ОПОРА...md` — доменні знання колишньої ОПОРИ (КМУ №692/1048,
+4. `docs/architecture/decision-records/0002-bootstrap-wedge-free-models.md` —
+   wedge-стратегія, $0 burn, правила free-моделей, stop-loss. Читати перед плануванням фіч.
+5. `docs/research/2026-09-competitor-analysis.md` — конкуренти 14+3, матриця X×Y,
+   Pareto-backlog. Читати перед вибором фіч.
+6. `docs/plans/pareto-roadmap.md` — фази, наступні кроки (B1/B2/B3), stop-loss.
+   Живий документ: оновлювати при закритті фази.
+7. `docs/research/ПЛАН_ОПОРА...md` — доменні знання колишньої ОПОРИ (КМУ №692/1048,
    тарифи НКРЕКП); стане в нагоді, коли модулі ОПОРИ повернуться як конфгуровані застосунки.
-5. `reference/opora-v1/` — **заморожений референс** попередньої реалізації.
+8. `reference/opora-v1/` — **заморожений референс** попередньої реалізації.
    Читати можна; імпортувати чи розширювати — ні.
 
 ## Структура (pnpm workspaces + Turborepo)
@@ -25,17 +31,17 @@
 
 | Пакет | Роль | Тести |
 |---|---|---|
-| `packages/dsl` | Zod-схеми DSL + `parseAppDefinition`. Вирази (`allow`, `if`) НЕ виконуються. Умови workflow: == != < <= > >= (числа). | 27 |
+| `packages/dsl` | Zod-схеми DSL + `parseAppDefinition`. Вирази (`allow`, `if`) НЕ виконуються. Умови workflow: == != < <= > >= (числа). Фікстури: service-desk, inventory, hr-desk. | 29 |
 | `packages/data-runtime` | DataPort-контракт: Memory + D1 адаптери; валідація записів; audit+outbox у мутаціях. SQL-білдери окремо від БД. Пошук _q (LIKE+escape), агрегації. | 22 |
-| `packages/metadata` | Реєстр застосунків і релізів (draft/publish/getActive/listReleases/updateDraft). DSL-валідація через @opora/dsl. | 13 |
-| `packages/workflow` | Матчинг workflow за подією, умови (проста рівність v1), executor (webhook/assign; function-values skip). | 12 |
+| `packages/metadata` | Реєстр застосунків і релізів: draft/publish/rollback/getActive/getRelease/updateDraft + `diffAppDefinitions` (зміни і breaking-ризики). DSL-валідація через @opora/dsl. | 28 |
+| `packages/workflow` | Матчинг workflow за подією, умови == != < <= > >= (порядок — лише числа; інакше false; неграматика → skipped), executor (webhook/assign; function-values skip). | 17 |
 
 ### Застосунки
 
 | Застосунок | Роль | Deploy |
 |---|---|---|
-| `apps/api` | Hono runtime API: `/v1/apps` → releases/publish → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом. Auth: HMAC Bearer tokens. Record-level RBAC. Stats + connections endpoints. | Workers: https://opora-core-api.p4d-b2q.workers.dev (33 тести) |
-| `apps/runtime-web` | Vite React SPA: generated table/form CRUD UI from published schema + Builder mode (entity editor, release manager). | Pages: https://opora-runtime.pages.dev (7 тестів) |
+| `apps/api` | Hono runtime API: `/v1/apps` → releases/publish/rollback/diff → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом. Auth: HMAC Bearer tokens. Record-level RBAC. Stats + connections endpoints. | Workers: https://opora-core-api.p4d-b2q.workers.dev (38 тестів) |
+| `apps/runtime-web` | Vite React SPA: generated table/form CRUD UI from published schema + Builder mode (entity editor, release manager). | Pages: https://opora-runtime.pages.dev (9 тестів) |
 
 ### Заморожено
 
@@ -110,3 +116,8 @@ CI: `verify` (lint+typecheck+test) → `preflight` → `deploy` на master
 - Пошук `_q`: D1 LIKE згортає регістр лише для ASCII (нема ICU) — кирилиця
   case-sensitive; memory-адаптер — insensitive. Повна уніфікація = ICU/
   нормалізована колонка, відкладено свідомо.
+- Референційна цілісність DSL: видалення поля, на яке посилається сторінка
+  (columns/fields/groupBy), валить чернетку 400. Поле прибирати разом із
+  посиланнями — інакше publish/diff-тести впадуть не там де чекаєш.
+- Перед publish дивитись `GET .../releases/:v/diff` (breaking-ризики);
+  відкат — `POST .../releases/:v/rollback` (лише на published, історія не треться).

@@ -76,6 +76,55 @@ describe('D1MetadataPort', () => {
     expect(db.calls('UPDATE apps SET active_version')).toHaveLength(1);
   });
 
+  it('rollback перемикає active_version лише на published без зміни статусів', async () => {
+    const db = new FakeD1([
+      { test: (s) => s.includes('FROM apps WHERE slug'), handle: () => appRow },
+      {
+        test: (s) => s.includes('FROM app_releases WHERE'),
+        handle: () => ({ app_slug: 'sd', version: 1, status: 'published', definition: JSON.stringify(minimalDef()), published_at: '2026-09-04T00:00:00.000Z' }),
+      },
+      { test: (s) => s.includes('UPDATE apps SET active_version'), handle: () => null },
+    ]);
+    const port = new D1MetadataPort(db as never);
+    const rolled = await port.rollback('sd', 1);
+    expect(rolled.version).toBe(1);
+    expect(rolled.status).toBe('published');
+    expect(db.calls('UPDATE apps SET active_version')).toHaveLength(1);
+    expect(db.calls('UPDATE app_releases SET status')).toHaveLength(0);
+  });
+
+  it('rollback на draft → invalid_definition, на відсутній → not_found', async () => {
+    const draftDb = new FakeD1([
+      { test: (s) => s.includes('FROM apps WHERE slug'), handle: () => appRow },
+      {
+        test: (s) => s.includes('FROM app_releases WHERE'),
+        handle: () => ({ app_slug: 'sd', version: 2, status: 'draft', definition: JSON.stringify(minimalDef()), published_at: null }),
+      },
+    ]);
+    await expect(new D1MetadataPort(draftDb as never).rollback('sd', 2)).rejects.toMatchObject({
+      code: 'invalid_definition',
+    });
+
+    const missingDb = new FakeD1([
+      { test: (s) => s.includes('FROM apps WHERE slug'), handle: () => appRow },
+      { test: (s) => s.includes('FROM app_releases WHERE'), handle: () => null },
+    ]);
+    await expect(new D1MetadataPort(missingDb as never).rollback('sd', 99)).rejects.toMatchObject({
+      code: 'not_found',
+    });
+  });
+
+  it('updateDraft відсутньої чернетки → not_found (не мовчазний no-op)', async () => {
+    const db = new FakeD1([
+      { test: (s) => s.includes('FROM apps WHERE slug'), handle: () => appRow },
+      { test: (s) => s.includes('FROM app_releases WHERE'), handle: () => null },
+    ]);
+    await expect(new D1MetadataPort(db as never).updateDraft('sd', 99, minimalDef())).rejects.toMatchObject({
+      code: 'not_found',
+    });
+    expect(db.calls('UPDATE app_releases SET definition')).toHaveLength(0);
+  });
+
   it('getActive читає JOIN-ом лише published', async () => {
     const db = new FakeD1([
       {
@@ -106,6 +155,15 @@ describe('D1MetadataPort', () => {
     await expect(new D1MetadataPort(db as never).deleteApp('ghost')).rejects.toMatchObject({
       code: 'not_found',
     });
+  });
+
+  it('getRelease повертає реліз або null', async () => {
+    const row = { app_slug: 'sd', version: 2, status: 'draft', definition: JSON.stringify(minimalDef()), published_at: null };
+    const db = new FakeD1([{ test: (s) => s.includes('FROM app_releases WHERE'), handle: () => row }]);
+    expect((await new D1MetadataPort(db as never).getRelease('sd', 2))?.status).toBe('draft');
+
+    const empty = new FakeD1([{ test: (s) => s.includes('FROM app_releases WHERE'), handle: () => null }]);
+    expect(await new D1MetadataPort(empty as never).getRelease('sd', 99)).toBeNull();
   });
 });
 

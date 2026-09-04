@@ -39,18 +39,18 @@
   └─ API + Auth (HMAC-токени, tenant isolation)
 ```
 
-Монорепо `pnpm workspaces + Turborepo`, **125 тестів**, зелений CI з автодеплоєм.
+Монорепо `pnpm workspaces + Turborepo`, **143 тести**, зелений CI з автодеплоєм.
 
 | Пакет | Роль | Тести |
 |---|---|---|
-| `packages/dsl` | Zod-схеми DSL + `parseAppDefinition`. Умови workflow: `== != < <= > >=` (порядок — лише числа) | 27 |
+| `packages/dsl` | Zod-схеми DSL + `parseAppDefinition`. Умови workflow: `== != < <= > >=` (порядок — лише числа) | 29 |
 | `packages/data-runtime` | DataPort-контракт: Memory + D1 адаптери, валідація, пошук `_q` (LIKE + escape), агрегації | 22 |
-| `packages/metadata` | Реєстр застосунків і релізів: draft / publish / getActive / delete | 16 |
-| `packages/workflow` | Матчинг за подією, executor (webhook / assign) | 17 |
+| `packages/metadata` | Реєстр застосунків і релізів: draft / publish / rollback / getActive / getRelease / `diffAppDefinitions` | 28 |
+| `packages/workflow` | Матчинг за подією, умови `== != < <= > >=`, executor (webhook / assign) | 17 |
 
 | Застосунок | Роль | Прод |
 |---|---|---|
-| `apps/api` | Hono API: `/v1/apps` → релізи → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом; RBAC; audit; stats; connections | Workers + D1 (34 тести) |
+| `apps/api` | Hono API: `/v1/apps` → релізи → `/v1/apps/:slug/data/:entity` CRUD за PUBLISHED релізом; RBAC; audit; stats; connections; rollback + diff релізів | Workers + D1 (38 тестів) |
 | `apps/runtime-web` | Vite + React 19 SPA: runtime CRUD + Builder + аудит + автоматизації | Pages (9 тестів) |
 
 ## Швидкий старт
@@ -76,7 +76,7 @@ npm run dev                # http://localhost:5174
 
 ## Ключові концепції
 
-- **DSL + релізи.** Застосунок = JSON-визначення (сутності, сторінки, політики, workflow). Зміни йдуть чернетками; Runtime і API працюють лише з опублікованою версією. Візуальний редактор Builder несе `workflows`/`policies` транзитом — publish їх не тре.
+- **DSL + релізи.** Застосунок = JSON-визначення (сутності, сторінки, політики, workflow). Зміни йдуть чернетками; Runtime і API працюють лише з опублікованою версією. Перед publish — `GET .../releases/:v/diff` показує зміни і breaking-ризики; відкат — `POST .../releases/:v/rollback` в 1 клік без втрати історії. Візуальний редактор Builder несе `workflows`/`policies` транзитом — publish їх не тре.
 - **DataPort.** Єдиний контракт доступу до даних. Кожна мутація пише audit event + outbox event. Власник запису — колонка `owner_id` (не поле `data`).
 - **Workflow.** Тригер `сутність.подія` (`created`/`deleted`), умова `record.поле OP літерал`, дії webhook / assign. Щохвилинний cron-дрен, ідемпотентність за ключем, журнал виконань зі статусами `ok / skipped / error`.
 - **Доступи.** Ролі `owner / admin / member`; записи — за власністю; runs/audit/connections — для привілейованих. Неавторизовані читання ізольовані `X-Opora-Tenant`-заголовком (демо-трейдоф).
@@ -106,7 +106,7 @@ npm run dev                # http://localhost:5174
 }
 ```
 
-Готові приклади: `packages/dsl/fixtures/service-desk.json`, `packages/dsl/fixtures/inventory.json`.
+Готові приклади: `packages/dsl/fixtures/service-desk.json`, `packages/dsl/fixtures/inventory.json`, `packages/dsl/fixtures/hr-desk.json` (воронка найму: вакансії → кандидати → онбординг; доводиться e2e-тестом без коду платформи).
 
 ## API (стисло)
 
@@ -117,6 +117,8 @@ npm run dev                # http://localhost:5174
 | DELETE | `/v1/apps/:slug` | admin / owner |
 | GET/POST | `/v1/apps/:slug/releases` | відкритий |
 | POST | `/v1/apps/:slug/releases/:v/publish` | відкритий |
+| POST | `/v1/apps/:slug/releases/:v/rollback` | відкритий (лише на published) |
+| GET | `/v1/apps/:slug/releases/:v/diff?against=active\|N` | відкритий (зміни + breaking-ризики) |
 | GET | `/v1/apps/:slug/schema` | відкритий |
 | GET/POST/PATCH/DELETE | `/v1/apps/:slug/data/:entity[/:id]` | читання — всі; чужі записи — 404; `?_q=&_sort=&_limit=&_offset=` |
 | GET | `/v1/apps/:slug/data/:entity/stats?groupBy=` | ті ж правила видимості |
@@ -129,14 +131,16 @@ npm run dev                # http://localhost:5174
 
 ## Статус і дорожня карта
 
-Працює: мультитенантність і ролі, конфігурована модель, автогенеровані CRUD UI + API, фільтри/пошук/сорт/stats, workflow з runs-журналом, аудит, автодеплой.
+Працює: мультитенантність і ролі, конфігурована модель, автогенеровані CRUD UI + API, фільтри/пошук/сорт/stats, workflow з runs-журналом, аудит, diff + rollback релізів, HR Desk-шаблон як доказ «новий застосунок без коду платформи», автодеплой.
 
-Далі: жива webhook-доставка (налаштувати `CONNECTIONS`), умови за датами, дашборди понад `count group by`, Extension SDK.
+Далі: жива webhook-доставка (налаштувати `CONNECTIONS`), sum-агрегація під ПН-сторож, укр. пакет дня 1 (НП/Checkbox/Дія), умови за датами, Extension SDK.
 
 ## Документація
 
 - `docs/blueprint/saas-platform-blueprint.md` — головна специфікація (не відступати без ADR)
 - `docs/specs/platform-spec.md` — контракти платформи v0.1
-- `docs/architecture/decision-records/` — ADR (0001: півот на конфігуровану платформу)
+- `docs/architecture/decision-records/` — ADR (0001: півот на конфігуровану платформу; 0002: bootstrap-wedge + free-моделі)
+- `docs/research/2026-09-competitor-analysis.md` — конкуренти 14+3 за Парето-матрицею X×Y
+- `docs/plans/pareto-roadmap.md` — стратегія і план: фази, наступні кроки, stop-loss (живий документ)
 - `AGENTS.md` — інструкції для агентів: команди, межі пакетів, gotchas
 - `reference/opora-v1/` — заморожений референс попередньої вертикальної реалізації (тільки читання)

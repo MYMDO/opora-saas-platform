@@ -65,6 +65,18 @@ export class MemoryMetadataPort implements MetadataPort {
     return clone(release);
   }
 
+  async rollback(appSlug: string, version: number): Promise<ReleaseMeta> {
+    this.mustApp(appSlug);
+    const release = this.releases.get(key(appSlug, version));
+    if (!release) throw new MetadataError('not_found', `Реліз v${version} не знайдено`);
+    if (release.status !== 'published') {
+      throw new MetadataError('invalid_definition', `Відкотити можна лише на published реліз (v${version} — ${release.status})`);
+    }
+    const meta = this.apps.get(appSlug);
+    if (meta) meta.activeVersion = version;
+    return clone(release);
+  }
+
   async listReleases(appSlug: string): Promise<Array<{ version: number; status: string; publishedAt: string | null }>> {
     return [...this.releases.values()]
       .filter((r) => r.appSlug === appSlug)
@@ -84,12 +96,16 @@ export class MemoryMetadataPort implements MetadataPort {
 
   async getActive(
     appSlug: string,
-  ): Promise<{ version: number; definition: AppDefinition } | null> {
-    const app = this.apps.get(appSlug);
+  ): Promise<{ version: number; definition: AppDefinition } | null> {    const app = this.apps.get(appSlug);
     if (!app || app.activeVersion === null) return null;
     const release = this.releases.get(key(appSlug, app.activeVersion));
     if (!release || release.status !== 'published') return null;
     return { version: release.version, definition: structuredClone(release.definition) };
+  }
+
+  async getRelease(appSlug: string, version: number): Promise<ReleaseMeta | null> {
+    const release = this.releases.get(key(appSlug, version));
+    return release ? clone(release) : null;
   }
 
   private mustApp(slug: string): AppMeta {

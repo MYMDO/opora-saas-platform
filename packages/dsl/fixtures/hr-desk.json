@@ -1,0 +1,327 @@
+{
+  "app": {
+    "slug": "hr-desk",
+    "name": "HR Desk"
+  },
+  "entities": [
+    {
+      "apiName": "vacancy",
+      "label": "Вакансія",
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "maxLength": 200,
+          "label": "Назва посади"
+        },
+        {
+          "name": "department",
+          "type": "select",
+          "required": true,
+          "options": [
+            "production",
+            "logistics",
+            "sales",
+            "office"
+          ],
+          "label": "Підрозділ"
+        },
+        {
+          "name": "employment",
+          "type": "select",
+          "options": [
+            "fulltime",
+            "parttime",
+            "remote"
+          ],
+          "default": "fulltime",
+          "label": "Зайнятість"
+        },
+        {
+          "name": "salary_min",
+          "type": "number",
+          "min": 0,
+          "label": "Зарплата від"
+        },
+        {
+          "name": "salary_max",
+          "type": "number",
+          "min": 0,
+          "label": "Зарплата до"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "options": [
+            "open",
+            "onhold",
+            "closed"
+          ],
+          "default": "open",
+          "label": "Статус"
+        },
+        {
+          "name": "opened_at",
+          "type": "date",
+          "default": "today",
+          "label": "Відкрито"
+        }
+      ]
+    },
+    {
+      "apiName": "candidate",
+      "label": "Кандидат",
+      "fields": [
+        {
+          "name": "full_name",
+          "type": "text",
+          "required": true,
+          "maxLength": 200,
+          "label": "Повне імʼя"
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "maxLength": 40,
+          "label": "Телефон"
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "maxLength": 200,
+          "label": "Email"
+        },
+        {
+          "name": "vacancy",
+          "type": "relation",
+          "target": "vacancy",
+          "cardinality": "one",
+          "label": "Вакансія"
+        },
+        {
+          "name": "source",
+          "type": "select",
+          "options": [
+            "referral",
+            "work_ua",
+            "robota_ua",
+            "dou",
+            "other"
+          ],
+          "default": "other",
+          "label": "Джерело"
+        },
+        {
+          "name": "stage",
+          "type": "select",
+          "required": true,
+          "options": [
+            "new",
+            "screening",
+            "interview",
+            "offer",
+            "hired",
+            "rejected"
+          ],
+          "default": "new",
+          "label": "Етап"
+        },
+        {
+          "name": "rating",
+          "type": "number",
+          "min": 1,
+          "max": 5,
+          "label": "Оцінка"
+        },
+        {
+          "name": "applied_at",
+          "type": "date",
+          "default": "today",
+          "label": "Дата звернення"
+        },
+        {
+          "name": "notes",
+          "type": "longtext",
+          "label": "Нотатки"
+        }
+      ]
+    },
+    {
+      "apiName": "onboarding",
+      "label": "Онбординг",
+      "fields": [
+        {
+          "name": "candidate",
+          "type": "relation",
+          "target": "candidate",
+          "cardinality": "one",
+          "required": true,
+          "label": "Кандидат"
+        },
+        {
+          "name": "mentor",
+          "type": "text",
+          "maxLength": 200,
+          "label": "Наставник"
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "label": "Перший робочий день"
+        },
+        {
+          "name": "checklist_done",
+          "type": "boolean",
+          "default": false,
+          "label": "Чекліст закрито"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "options": [
+            "planned",
+            "in_progress",
+            "done"
+          ],
+          "default": "planned",
+          "label": "Статус"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "path": "/vacancies",
+      "label": "Вакансії",
+      "entity": "vacancy",
+      "view": {
+        "kind": "table",
+        "columns": [
+          "title",
+          "department",
+          "status"
+        ]
+      }
+    },
+    {
+      "path": "/vacancies/new",
+      "label": "Нова вакансія",
+      "entity": "vacancy",
+      "view": {
+        "kind": "form",
+        "fields": [
+          "title",
+          "department",
+          "employment",
+          "salary_min",
+          "salary_max"
+        ]
+      }
+    },
+    {
+      "path": "/candidates",
+      "label": "Кандидати",
+      "entity": "candidate",
+      "view": {
+        "kind": "table",
+        "columns": [
+          "full_name",
+          "stage",
+          "rating",
+          "applied_at"
+        ]
+      }
+    },
+    {
+      "path": "/candidates/new",
+      "label": "Новий кандидат",
+      "entity": "candidate",
+      "view": {
+        "kind": "form",
+        "fields": [
+          "full_name",
+          "phone",
+          "email",
+          "vacancy",
+          "source"
+        ]
+      }
+    },
+    {
+      "path": "/candidates/stages",
+      "label": "Воронка за етапами",
+      "entity": "candidate",
+      "view": {
+        "kind": "stats",
+        "groupBy": "stage"
+      }
+    },
+    {
+      "path": "/onboarding",
+      "label": "Онбординг",
+      "entity": "onboarding",
+      "view": {
+        "kind": "table",
+        "columns": [
+          "status",
+          "start_date",
+          "checklist_done"
+        ]
+      }
+    }
+  ],
+  "policies": [
+    {
+      "resource": "candidate",
+      "action": "read",
+      "allow": "role('hr') || record.ownerId == user.id"
+    },
+    {
+      "resource": "candidate",
+      "action": "create",
+      "allow": "role('hr') || role('manager')"
+    },
+    {
+      "resource": "vacancy",
+      "action": "read",
+      "allow": "role('hr') || role('manager')"
+    },
+    {
+      "resource": "onboarding",
+      "action": "read",
+      "allow": "role('hr')"
+    }
+  ],
+  "workflows": [
+    {
+      "on": "candidate.created",
+      "if": "record.stage == 'new'",
+      "steps": [
+        {
+          "type": "assign",
+          "field": "owner_id",
+          "value": "firstAvailable('hr')"
+        },
+        {
+          "type": "webhook",
+          "connection": "hr-channel",
+          "event": "candidate.created"
+        }
+      ]
+    },
+    {
+      "on": "candidate.updated",
+      "if": "record.stage == 'hired'",
+      "steps": [
+        {
+          "type": "webhook",
+          "connection": "hr-channel",
+          "event": "candidate.hired"
+        }
+      ]
+    }
+  ]
+}

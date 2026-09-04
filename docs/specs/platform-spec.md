@@ -104,17 +104,42 @@ GET  /v1/audit?resource=&since=              → стрічка аудиту (ad
 Конвенції: camelCase JSON; помилка = `{error, issues?}`; пагінація cursor;
 ідемпотентність POST через заголовок `Idempotency-Key` (зберігаємо 24 год).
 
+> **Факт реалізації (2026-09-04, 143 тести).** Працює зараз:
+> ```
+> POST /v1/auth/token {email}              → {token, userId, tenantSlug} (MVP, без OTP)
+> GET  /v1/me                               → {actorId, tenantId} (за Bearer)
+> GET|POST /v1/apps · DELETE /v1/apps/:slug (admin/owner)
+> POST /v1/apps/:slug/releases              → draft (DSL-валідація, 400 + issues)
+> PATCH /v1/apps/:slug/releases/:ver        → оновлення чернетки
+> POST /v1/apps/:slug/releases/:ver/publish → атомарна публікація (batch)
+> POST /v1/apps/:slug/releases/:ver/rollback→ відкат на published без втрати історії
+> GET  /v1/apps/:slug/releases/:ver/diff?against=active|N → зміни + breaking-ризики
+> GET  /v1/apps/:slug/releases · GET /v1/apps/:slug/schema (published)
+> GET|POST /v1/apps/:slug/data/:entity?filter&_q&_sort&_limit&_offset
+> GET|PATCH|DELETE /v1/apps/:slug/data/:entity/:id
+> GET  /v1/apps/:slug/data/:entity/stats?groupBy=
+> GET  /v1/audit · /v1/workflow-runs · /v1/connections (admin/owner)
+> POST /v1/automation/drain (X-Drain-Key)
+> ```
+> Пагінація — `_limit/_offset` (cursor — наступне). `Idempotency-Key` —
+> через outbox/idempotency workflow-виконань, не окремим заголовком.
+> Наступне за чергою: Auth A1 (OTP), sum-агрегація, укр. пакет інтеграцій.
+
 ---
 
 ## 5. DSL: стан і еволюція
 
 - ✅ `packages/dsl@0.1`: entities/fields (8 типів)/pages/policies/workflows;
-  `parseAppDefinition` + референційна цілісність; 25 тестів (23 негативні).
+  `parseAppDefinition` + референційна цілісність; 29 тестів.
+  Фікстури: service-desk, inventory, hr-desk (воронка найму; e2e без коду платформи).
+- ✅ Diff конфігурацій до publish: `diffAppDefinitions` + `GET .../releases/:v/diff`
+  (ризики `field_removed`/`field_type_changed`/`policy_removed`, прапорець `breaking`);
+  відкат — `POST .../releases/:v/rollback`.
 - Наступне: `computed` поля та формули — окремий пакет `packages/formula`
   (AST: літерали, оператори порівняння/арифметики, allow-list функцій;
   заборонено: `eval`, доступ до мережі/часу поза інʼєкцією, глибина >20).
-- Версіонування DSL: поле `dslVersion` у корені визначення; міграції конфігурацій
-  показують diff адміністратору до publish (§10 блюпринта).
+- Версіонування DSL: поле `dslVersion` у корені визначення — наступне;
+  diff/rollback уже працюють (§10 блюпринта закрито на рівні API, UI-поверхня — далі).
 
 ---
 
@@ -152,13 +177,13 @@ workflow лише через DataPort-контракти.
 
 | # | Крок | Пакет(и) | Критерій готовності |
 |---|---|---|---|
-| 1 | Auth A1 + orgs/roles + audit | apps/api, packages/metadata | OTP-вхід; tenant-boundary тести зелені; audit пишеться |
-| 2 | Конфігурована модель даних | metadata, data-runtime | draft/publish release; records CRUD через DataPort; JSONB-індекси |
-| 3 | Autogen CRUD API+UI | ui-renderer, ui-schema | Service Desk §8 кроки 1–3 без нового коду платформи |
-| 4 | Views/permissions записів | ui-renderer, policy | requester бачить свої; agent — усі; field-level — після ABAC |
-| 5 | Workflows + webhooks | workflow | outbox→run; retry+idempotency-key; run-log |
-| 6 | Дашборди + конектори | connector-sdk | метрики-віджети; webhook out/in |
-| 7 | Extension SDK | sdk | sandboxed функції з лімітами часу/мережі |
+| 1 | Auth A1 + orgs/roles + audit | apps/api, packages/metadata | 🟡 частково: HMAC-токени + RBAC + audit + tenant-boundary тести зелені; OTP — наступне |
+| 2 | Конфігурована модель даних | metadata, data-runtime | ✅: draft/publish/rollback/diff/getRelease; records CRUD через DataPort; audit+outbox у мутаціях |
+| 3 | Autogen CRUD API+UI | ui-renderer, ui-schema | ✅: Service Desk і HR Desk без нового коду платформи (e2e-тести) |
+| 4 | Views/permissions записів | ui-renderer, policy | 🟡 частково: table/form/stats + record-RBAC; field-level — після ABAC |
+| 5 | Workflows + webhooks | workflow | 🟡 частково: outbox→run, idempotency, run-log зі статусами; retry/DLQ — наступне |
+| 6 | Дашборди + конектори | connector-sdk | 🟡 частково: stats `count group by` + connections-статус; sum-агрегація (під ПН-сторож) і укр. пакет — наступне |
+| 7 | Extension SDK | sdk | ⏳ відкладено за ADR 0002 (після workflows і перших клієнтів) |
 
 Definition of done MVP (§13 блюпринта): неінженер за 1 годину створює сутність,
 поля, форму, таблицю, ролі, правила й webhook — публікує без deploy.

@@ -116,6 +116,20 @@ export class D1MetadataPort implements MetadataPort {
     return releaseFrom({ ...releaseRow, status: 'published', published_at: ts });
   }
 
+  async rollback(appSlug: string, version: number): Promise<ReleaseMeta> {
+    await this.mustApp(appSlug);
+    const releaseRow = await this.db
+      .prepare('SELECT * FROM app_releases WHERE app_slug = ?1 AND version = ?2')
+      .bind(appSlug, version)
+      .first<ReleaseRow>();
+    if (!releaseRow) throw new MetadataError('not_found', `Реліз v${version} не знайдено`);
+    if (releaseRow.status !== 'published') {
+      throw new MetadataError('invalid_definition', `Відкотити можна лише на published реліз (v${version} — ${releaseRow.status})`);
+    }
+    await this.db.prepare('UPDATE apps SET active_version = ?2 WHERE slug = ?1').bind(appSlug, version).run();
+    return releaseFrom(releaseRow);
+  }
+
   async listReleases(appSlug: string): Promise<Array<{ version: number; status: string; publishedAt: string | null }>> {
     const { results } = await this.db
       .prepare('SELECT version, status, published_at FROM app_releases WHERE app_slug = ?1 ORDER BY version DESC')
@@ -130,12 +144,18 @@ export class D1MetadataPort implements MetadataPort {
 
   async updateDraft(appSlug: string, version: number, definitionInput: unknown): Promise<void> {
     await this.mustApp(appSlug);
+    const existing = await this.db
+      .prepare('SELECT status FROM app_releases WHERE app_slug = ?1 AND version = ?2')
+      .bind(appSlug, version)
+      .first<{ status: ReleaseStatus }>();
+    if (!existing || existing.status !== 'draft') {
+      throw new MetadataError('not_found', `Чернетку v${version} не знайдено`);
+    }
     const parsedDef = parseAppDefinition(definitionInput);
-    const res = await this.db
+    await this.db
       .prepare("UPDATE app_releases SET definition = ?3 WHERE app_slug = ?1 AND version = ?2 AND status = 'draft'")
       .bind(appSlug, version, JSON.stringify(parsedDef))
       .run();
-    void res;
   }
 
   async getActive(
@@ -152,6 +172,14 @@ export class D1MetadataPort implements MetadataPort {
       .first<{ version: number; definition: string }>();
     if (!row) return null;
     return { version: row.version, definition: JSON.parse(row.definition) as AppDefinition };
+  }
+
+  async getRelease(appSlug: string, version: number): Promise<ReleaseMeta | null> {
+    const row = await this.db
+      .prepare('SELECT * FROM app_releases WHERE app_slug = ?1 AND version = ?2')
+      .bind(appSlug, version)
+      .first<ReleaseRow>();
+    return row ? releaseFrom(row) : null;
   }
 
   private async mustApp(slug: string): Promise<AppRow> {

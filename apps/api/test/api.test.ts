@@ -291,8 +291,128 @@ describe('opora-api — вертикальний зріз Service Desk', () => {
     expect(body.issues.length).toBeGreaterThan(0);
   });
 
+  it('rollback повертає схему на раніший published реліз', async () => {
+    const c = makeClient();
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'rb-app', name: 'RB' }));
+    await c.request('/v1/apps/rb-app/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/rb-app/releases/1/publish', jsonInit('POST'));
+    await c.request('/v1/apps/rb-app/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/rb-app/releases/2/publish', jsonInit('POST'));
+
+    const rolled = await c.request('/v1/apps/rb-app/releases/1/rollback', jsonInit('POST'));
+    expect(rolled.status).toBe(200);
+    const schema = (await (await c.request('/v1/apps/rb-app/schema')).json()) as { version: number };
+    expect(schema.version).toBe(1);
+
+    expect((await c.request('/v1/apps/rb-app/releases/2/rollback', jsonInit('POST'))).status).toBe(200);
+    expect((await c.request('/v1/apps/rb-app/releases/99/rollback', jsonInit('POST'))).status).toBe(404);
+  });
+
+  it('rollback на draft → 400', async () => {
+    const c = makeClient();
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'rb-draft', name: 'RB Draft' }));
+    await c.request('/v1/apps/rb-draft/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/rb-draft/releases/1/publish', jsonInit('POST'));
+    await c.request('/v1/apps/rb-draft/releases', jsonInit('POST', fixture));
+    expect((await c.request('/v1/apps/rb-draft/releases/2/rollback', jsonInit('POST'))).status).toBe(400);
+  });
+
   it('health відповідає без залежностей', async () => {
     expect((await makeClient().request('/v1/health')).status).toBe(200);
+  });
+
+  it('diff показує ризики чернетки відносно активного релізу', async () => {
+    const c = makeClient();
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'diff-app', name: 'Diff' }));
+    await c.request('/v1/apps/diff-app/releases', jsonInit('POST', fixture));
+    await c.request('/v1/apps/diff-app/releases/1/publish', jsonInit('POST'));
+
+    const slim = structuredClone(fixture) as {
+      entities: Array<{ apiName: string; fields: Array<{ name: string }> }>;
+      pages: Array<{ view: { fields?: string[] } }>;
+    };
+    const ticket = slim.entities.find((e) => e.apiName === 'ticket')!;
+    ticket.fields = ticket.fields.filter((f) => f.name !== 'description');
+    for (const page of slim.pages) {
+      if (page.view.fields) page.view.fields = page.view.fields.filter((f) => f !== 'description');
+    }
+    await c.request('/v1/apps/diff-app/releases', jsonInit('POST', slim));
+
+    const res = await c.request('/v1/apps/diff-app/releases/2/diff');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      version: number;
+      against: number;
+      diff: { risks: string[]; breaking: boolean };
+    };
+    expect(body.version).toBe(2);
+    expect(body.against).toBe(1);
+    expect(body.diff.risks).toContain('field_removed:ticket.description');
+    expect(body.diff.breaking).toBe(true);
+
+    const same = (await (await c.request('/v1/apps/diff-app/releases/1/diff?against=1')).json()) as {
+      diff: { risks: string[]; breaking: boolean };
+    };
+    expect(same.diff.risks).toEqual([]);
+    expect(same.diff.breaking).toBe(false);
+
+    expect((await c.request('/v1/apps/diff-app/releases/99/diff')).status).toBe(404);
+    expect((await c.request('/v1/apps/diff-app/releases/2/diff?against=oops')).status).toBe(400);
+  });
+
+  it('hr-desk: новий застосунок з конфігурації без коду платформи', async () => {
+    const hrFixture = JSON.parse(
+      readFileSync(join(__dirname, '../../../packages/dsl/fixtures/hr-desk.json'), 'utf-8'),
+    );
+    const c = makeClient();
+    await c.request('/v1/apps', jsonInit('POST', { slug: 'hr-desk', name: 'HR Desk' }));
+    expect((await c.request('/v1/apps/hr-desk/releases', jsonInit('POST', hrFixture))).status).toBe(201);
+    expect((await c.request('/v1/apps/hr-desk/releases/1/publish', jsonInit('POST'))).status).toBe(200);
+
+    const vacancy = (await (
+      await c.request('/v1/apps/hr-desk/data/vacancy', jsonInit('POST', { title: 'Водій', department: 'logistics' }))
+    ).json()) as { record: { id: string } };
+    expect(vacancy.record.id).toBeTruthy();
+
+    const hired = (await (
+      await c.request(
+        '/v1/apps/hr-desk/data/candidate',
+        jsonInit('POST', { full_name: 'Олена', stage: 'hired', rating: 5 }),
+      )
+    ).json()) as { record: { id: string } };
+    await c.request('/v1/apps/hr-desk/data/candidate', jsonInit('POST', { full_name: 'Ігор', stage: 'new' }));
+
+    const listed = (await (
+      await c.request('/v1/apps/hr-desk/data/candidate?stage=hired')
+    ).json()) as { records: Array<{ id: string }> };
+    expect(listed.records.map((r) => r.id)).toEqual([hired.record.id]);
+
+    const funnel = (await (await c.request('/v1/apps/hr-desk/data/candidate/stats?groupBy=stage')).json()) as {
+      groups: Array<{ value: string; count: number }>;
+    };
+    expect(funnel.groups).toHaveLength(2);
+    expect(c.data.state.outbox.map((o) => o.eventType)).toContain('candidate.created');
+  });
+
+  it('/v1/me: без токена 401, з токеном actor+tenant', async () => {
+    const SECRET = 'me-test-secret-32-chars!!!!!!!';
+    const c = makeClient({ authSecret: SECRET });
+    expect((await c.request('/v1/me')).status).toBe(401);
+    const token = await signToken({ userId: 'u9', email: 'e@x.ua', tenantSlug: 'acme', role: 'member' }, SECRET);
+    const res = await c.request('/v1/me', { headers: { Authorization: `Bearer ${token}` } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ actorId: 'u9', tenantId: 'acme' });
+  });
+
+  it('PATCH чернетки оновлює definition; published чіпати не можна', async () => {
+    const c = await setupPublishedServiceDesk();
+    await c.request('/v1/apps/service-desk/releases', jsonInit('POST', fixture));
+    const changed = structuredClone(fixture) as { app: { name: string } };
+    changed.app.name = 'Service Desk v2';
+    const ok = await c.request('/v1/apps/service-desk/releases/2', jsonInit('PATCH', changed));
+    expect(ok.status).toBe(200);
+    const published = await c.request('/v1/apps/service-desk/releases/1', jsonInit('PATCH', changed));
+    expect(published.status).toBe(404);
   });
 });
 

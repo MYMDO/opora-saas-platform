@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { EntityDefinition } from '@opora/dsl';
 import type { MetadataPort } from '@opora/metadata';
+import { diffAppDefinitions } from '@opora/metadata';
 import type { DataPort } from '@opora/data-runtime';
 import { RecordNotFoundError, ValidationError } from '@opora/data-runtime';
 
@@ -198,6 +199,46 @@ export function createApp(deps: ApiDeps) {
     try {
       const release = await deps.metadata.publish(c.req.param('slug'), version);
       return c.json({ release });
+    } catch (e) {
+      return mapMetaError(c, e);
+    }
+  });
+
+  app.post('/v1/apps/:slug/releases/:version/rollback', async (c) => {
+    const version = Number(c.req.param('version'));
+    if (!Number.isInteger(version)) return c.json({ error: 'некоректна версія' }, 400);
+    try {
+      const release = await deps.metadata.rollback(c.req.param('slug'), version);
+      return c.json({ release });
+    } catch (e) {
+      return mapMetaError(c, e);
+    }
+  });
+
+  app.get('/v1/apps/:slug/releases/:version/diff', async (c) => {
+    const version = Number(c.req.param('version'));
+    if (!Number.isInteger(version)) return c.json({ error: 'некоректна версія' }, 400);
+    const againstRaw = c.req.query('against') ?? 'active';
+    try {
+      const target = await deps.metadata.getRelease(c.req.param('slug'), version);
+      if (!target) return c.json({ error: `Реліз v${version} не знайдено` }, 404);
+      let against: { version: number; definition: typeof target.definition };
+      if (againstRaw === 'active') {
+        const active = await deps.metadata.getActive(c.req.param('slug'));
+        if (!active) return c.json({ error: 'Активний реліз відсутній' }, 404);
+        against = active;
+      } else {
+        const againstVersion = Number(againstRaw);
+        if (!Number.isInteger(againstVersion)) return c.json({ error: 'некоректний against' }, 400);
+        const base = await deps.metadata.getRelease(c.req.param('slug'), againstVersion);
+        if (!base) return c.json({ error: `Реліз v${againstVersion} не знайдено` }, 404);
+        against = { version: base.version, definition: base.definition };
+      }
+      return c.json({
+        version: target.version,
+        against: against.version,
+        diff: diffAppDefinitions(against.definition, target.definition),
+      });
     } catch (e) {
       return mapMetaError(c, e);
     }
