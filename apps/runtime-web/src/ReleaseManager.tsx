@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { client, type ReleaseMeta } from './client';
+import { client, type DefinitionDiffVM, type ReleaseMeta } from './client';
 import { DefinitionEditor, buildFullDefinition, type DefinitionDraft } from './DefinitionEditor';
 import { AutomationPanel } from './AutomationPanel';
 
@@ -12,6 +12,8 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 
 export function ReleaseManager({ appSlug }: { appSlug: string }) {
   const [releases, setReleases] = useState<ReleaseMeta[] | null>(null);
+  const [diffView, setDiffView] = useState<{ version: number; against: number; diff: DefinitionDiffVM } | null>(null);
+  const [diffBusy, setDiffBusy] = useState(false);
   const [draftJson, setDraftJson] = useState('');
   const [visualDraft, setVisualDraft] = useState<DefinitionDraft | null>(null);
 
@@ -64,6 +66,31 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
     }
   }
 
+  async function rollback(version: number) {
+    if (!window.confirm(`Відкотити «${appSlug}» на v${version}? Історія релізів збережеться.`)) return;
+    setError(null); setOkMsg(null);
+    try {
+      await client.rollbackRelease(appSlug, version);
+      setOkMsg(`Відкочено на v${version}`);
+      setDiffView(null);
+      await load();
+    } catch (e) {
+      setError(String(e).slice(0, 160));
+    }
+  }
+
+  async function showDiff(version: number) {
+    setError(null);
+    setDiffBusy(true);
+    try {
+      setDiffView(await client.getDiff(appSlug, version));
+    } catch (e) {
+      setError(String(e).slice(0, 160));
+    } finally {
+      setDiffBusy(false);
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -82,14 +109,64 @@ export function ReleaseManager({ appSlug }: { appSlug: string }) {
                   <Td>v{r.version}</Td>
                   <Td><StatusChip status={r.status} /></Td>
                   <Td>{r.publishedAt ? new Date(r.publishedAt).toLocaleString('uk-UA') : '—'}</Td>
-                  <Td>{r.status === 'draft' && (
-                    <button className="btn btn-solid" style={{ fontSize: 11, padding: '3px 10px' }}
-                      onClick={() => void publish(r.version)}>Publish</button>
-                  )}</Td>
+                  <td style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 10px' }}
+                      disabled={diffBusy} onClick={() => void showDiff(r.version)}>Diff</button>{' '}
+                    {r.status === 'draft' && (
+                      <button className="btn btn-solid" style={{ fontSize: 11, padding: '3px 10px' }}
+                        onClick={() => void publish(r.version)}>Publish</button>
+                    )}{' '}
+                    {r.status === 'published' && (
+                      <button className="btn btn-surface" style={{ fontSize: 11, padding: '3px 10px' }}
+                        onClick={() => void rollback(r.version)}>Відкат</button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        )}
+        {diffView && (
+          <div style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span className="f-mono" style={{ fontSize: 12.5, fontWeight: 700 }}>
+                  Diff v{diffView.version} → active v{diffView.against}
+                </span>{' '}
+                <span className="chip" style={{
+                  background: 'var(--surface-2)',
+                  color: diffView.diff.breaking ? 'var(--danger)' : 'var(--finance)',
+                }}>
+                  {diffView.diff.breaking ? 'breaking-ризики' : 'безпечно'}
+                </span>
+              </div>
+              <button className="btn btn-icon" onClick={() => setDiffView(null)} title="Закрити">✕</button>
+            </div>
+            {diffView.diff.risks.length > 0 && (
+              <div className="f-mono" style={{ fontSize: 11.5, color: 'var(--danger)', marginTop: 8 }}>
+                {diffView.diff.risks.map((risk) => <div key={risk}>{risk}</div>)}
+              </div>
+            )}
+            <DiffSection title="Сутності" added={diffView.diff.entities.added} removed={diffView.diff.entities.removed} />
+            {diffView.diff.entities.changed.map((c) => (
+              <div key={c.apiName} className="f-mono" style={{ fontSize: 11.5, marginTop: 4 }}>
+                ~ {c.apiName}
+                {c.addedFields.map((f) => <span key={f} style={{ color: 'var(--finance)' }}> +{f}</span>)}
+                {c.removedFields.map((f) => <span key={f} style={{ color: 'var(--danger)' }}> −{f}</span>)}
+                {c.changedFields.map((f) => (
+                  <div key={f.name} style={{ paddingLeft: 12, color: 'var(--text-mute)' }}>
+                    {f.name}: {f.changes.join('; ')}
+                  </div>
+                ))}
+              </div>
+            ))}
+            <DiffSection title="Сторінки" added={diffView.diff.pages.added} removed={diffView.diff.pages.removed} />
+            <DiffSection title="Політики" added={diffView.diff.policies.added} removed={diffView.diff.policies.removed} extra={diffView.diff.policies.changed} />
+            <DiffSection title="Автоматизації" added={diffView.diff.workflows.added} removed={diffView.diff.workflows.removed} extra={diffView.diff.workflows.changed} />
+            {diffView.diff.risks.length === 0 && diffView.diff.entities.changed.length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 6 }}>Змін немає.</div>
+            )}
+          </div>
         )}
       </div>
 
@@ -159,6 +236,23 @@ function Td({ children }: { children: ReactNode }) {
 function StatusChip({ status }: { status: string }) {
   const s = STATUS_COLORS[status] ?? { bg: 'var(--surface-2)', fg: 'var(--text-dim)' };
   return <span className="chip" style={{ background: s.bg, color: s.fg }}>{status}</span>;
+}
+
+function DiffSection({ title, added, removed, extra = [] }: {
+  title: string;
+  added: string[];
+  removed: string[];
+  extra?: string[];
+}) {
+  if (added.length === 0 && removed.length === 0 && extra.length === 0) return null;
+  return (
+    <div className="f-mono" style={{ fontSize: 11.5, marginTop: 6 }}>
+      <span style={{ color: 'var(--text-mute)' }}>{title}:</span>
+      {added.map((a) => <span key={`+${a}`} style={{ color: 'var(--finance)' }}> +{a}</span>)}
+      {removed.map((r) => <span key={`-${r}`} style={{ color: 'var(--danger)' }}> −{r}</span>)}
+      {extra.map((x) => <span key={`~${x}`} style={{ color: 'var(--energy)' }}> ~{x}</span>)}
+    </div>
+  );
 }
 
 function Eyebrow({ children }: { children: ReactNode }) {

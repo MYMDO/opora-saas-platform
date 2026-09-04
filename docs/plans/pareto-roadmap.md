@@ -18,7 +18,7 @@
 - [x] `GET .../releases/:v/diff` — зміни + breaking-ризики до publish (§10 блюпринта)
 - [x] `POST .../releases/:v/rollback` — відкат в 1 клік без втрати історії
 - [x] Tenant-boundary тести на endpoints, record-RBAC, audit/outbox у мутаціях
-- [ ] UI-поверхня diff/rollback у Builder (API готове, фронт — далі)
+- [x] UI-поверхня diff/rollback у Builder (кнопки Diff/Відкат у таблиці релізів, breaking-бейдж, ризики; компонентні тести).
 
 ## Фаза B — перші гроші 🟡 в процесі
 

@@ -89,6 +89,27 @@ export interface ReleaseMeta {
   publishedAt: string | null;
 }
 
+export interface FieldChangeVM {
+  name: string;
+  changes: string[];
+}
+
+export interface EntityChangeVM {
+  apiName: string;
+  addedFields: string[];
+  removedFields: string[];
+  changedFields: FieldChangeVM[];
+}
+
+export interface DefinitionDiffVM {
+  entities: { added: string[]; removed: string[]; changed: EntityChangeVM[] };
+  pages: { added: string[]; removed: string[] };
+  policies: { added: string[]; removed: string[]; changed: string[] };
+  workflows: { added: string[]; removed: string[]; changed: string[] };
+  risks: string[];
+  breaking: boolean;
+}
+
 export interface AuditEvent {
   id: string;
   tenantId: string;
@@ -140,6 +161,14 @@ export const client = {
     req<{ release: ReleaseMeta }>(`/v1/apps/${slug}/releases/${version}/publish`, {
       method: 'POST',
     }).then((r) => r.release),
+  rollbackRelease: (slug: string, version: number) =>
+    req<{ release: ReleaseMeta }>(`/v1/apps/${slug}/releases/${version}/rollback`, {
+      method: 'POST',
+    }).then((r) => r.release),
+  getDiff: (slug: string, version: number) =>
+    req<{ version: number; against: number; diff: DefinitionDiffVM }>(
+      `/v1/apps/${slug}/releases/${version}/diff`,
+    ),
   listRecords: (
     slug: string,
     entity: string,
